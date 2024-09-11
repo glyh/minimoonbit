@@ -388,7 +388,7 @@ test {
   inspect!(Syntax::from_json!(["Bool", true]), content="Bool(true)")
   inspect!(Syntax::from_json!(["Bool", false]), content="Bool(false)")
   inspect!(Syntax::from_json!(["Int", 1]), content="Int(1)")
-  inspect!(Syntax::from_json!(["Float", 1.0]), content="Double(1.0)")
+  inspect!(Syntax::from_json!(["Float", 1.0]), content="Double(1)")
   inspect!(
     Syntax::from_json!(["Not", ["Bool", true]]),
     content="Not(Bool(true))",
@@ -415,7 +415,7 @@ test {
   )
   inspect!(
     Syntax::from_json!(["FAdd", ["Float", 1.0], ["Float", 2.0]]),
-    content="Prim(Double(1.0), Double(2.0), Add, kind=Some(Double))",
+    content="Prim(Double(1), Double(2), Add, kind=Some(Double))",
   )
   inspect!(
     Syntax::from_json!(["FSub", ["Float", 1.0], ["Float", 2.0]]),
