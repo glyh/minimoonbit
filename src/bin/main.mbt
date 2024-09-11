@@ -10,6 +10,10 @@ fn main {
   let print_asm = Ref::new(false)
   let knf_opt_iters = Ref::new(10)
   let run_with_interpreter = Ref::new(false)
+  let stop_after_parse = Ref::new(false)
+  let stop_after_typecheck = Ref::new(false)
+  let knf_interpreter = Ref::new(false)
+  let closure_interpreter = Ref::new(false)
   @ArgParser.parse(
     [
       (
@@ -53,6 +57,30 @@ fn main {
           },
         ),
         "Number of optimization iterations",
+      ),
+      (
+        "--stop-after-parse",
+        "",
+        @ArgParser.Set(stop_after_parse),
+        "Stop after parse",
+      ),
+      (
+        "--stop-after-typecheck",
+        "",
+        @ArgParser.Set(stop_after_typecheck),
+        "Stop after typecheck",
+      ),
+      (
+        "--knf-interpreter",
+        "",
+        @ArgParser.Set(knf_interpreter),
+        "KNF interpreter",
+      ),
+      (
+        "--closure-interpreter",
+        "",
+        @ArgParser.Set(closure_interpreter),
+        "Closure interpreter",
       ),
     ],
     fn(s) {
