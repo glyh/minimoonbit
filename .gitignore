@@ -18,3 +18,5 @@ rv64_failed_tests/
 /*.s
 
 __pycache__
+
+/rvlinux
