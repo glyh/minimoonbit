@@ -56,7 +56,8 @@ pub enum Token {
   UNIT_T
   BOOL_T
   DOUBLE_T
-  INT(Int)
+  I32(Int)
+  F64(Double)
   NOT
   INT_T
   LET
@@ -106,6 +107,7 @@ enum LexState { // DFA State
   AfterDiv
   AfterLess
   AfterMinus
+  AfterFloatingDot
 }
 
 pub fn lex_string!(input : String) -> Array[(Token, Loc)] {
@@ -117,6 +119,8 @@ pub fn lex_string!(input : String) -> Array[(Token, Loc)] {
   let mut last_loc = loc
   let mut mode = Default
   let mut number_acc = 0
+  let mut number_acc_f64 = 0.0
+  let mut number_divdened_f64 = 1.0
   let ident_acc = Buffer::new(size_hint=128)
   while loc.index < index_ub {
     let char = chars[loc.index]
@@ -158,13 +162,32 @@ pub fn lex_string!(input : String) -> Array[(Token, Loc)] {
           }
         }
       }
-      // operators
       (Number, '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9') =>
         number_acc = number_acc * 10 + char.to_int() - '0'.to_int()
+      (Number, '.') => {
+        mode = AfterFloatingDot
+        number_acc_f64 = number_acc.to_double()
+        number_acc = 0
+      }
       (Number, _) => {
         mode = Default
-        result.push((INT(number_acc), last_loc))
+        result.push((I32(number_acc), last_loc))
         number_acc = 0
+        continue // don't consume
+      }
+      (
+        AfterFloatingDot,
+        '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9',
+      ) => {
+        number_acc_f64 = number_acc_f64 * 10 +
+          (char.to_int() - '0'.to_int()).to_double()
+        number_divdened_f64 *= 10
+      }
+      (AfterFloatingDot, _) => {
+        mode = Default
+        result.push((F64(number_acc_f64 / number_divdened_f64), last_loc))
+        number_acc_f64 = 0
+        number_divdened_f64 = 1
         continue // don't consume
       }
       (Ident, _) => {
@@ -242,10 +265,12 @@ test "simple lexing" {
       #|fn main {
       #|  print_int((make_adder(3))(7))
       #|};
+      #| 1.0007 9.
+      #| 114514
       ,
     ).map(fst),
     content=
-      #|[FN, ID("make_adder"), LPAREN, ID("x"), COLON, INT_T, RPAREN, ARROW, LPAREN, INT_T, RPAREN, ARROW, INT_T, LBRACE, FN, ID("adder"), LPAREN, ID("y"), COLON, INT_T, RPAREN, ARROW, INT_T, LBRACE, ID("x"), ADD, ID("y"), RBRACE, SEMICOL, ID("adder"), RBRACE, SEMICOL, FN, ID("main"), LBRACE, ID("print_int"), LPAREN, LPAREN, ID("make_adder"), LPAREN, INT(3), RPAREN, RPAREN, LPAREN, INT(7), RPAREN, RPAREN, RBRACE, SEMICOL]
+      #|[FN, ID("make_adder"), LPAREN, ID("x"), COLON, INT_T, RPAREN, ARROW, LPAREN, INT_T, RPAREN, ARROW, INT_T, LBRACE, FN, ID("adder"), LPAREN, ID("y"), COLON, INT_T, RPAREN, ARROW, INT_T, LBRACE, ID("x"), ADD, ID("y"), RBRACE, SEMICOL, ID("adder"), RBRACE, SEMICOL, FN, ID("main"), LBRACE, ID("print_int"), LPAREN, LPAREN, ID("make_adder"), LPAREN, I32(3), RPAREN, RPAREN, LPAREN, I32(7), RPAREN, RPAREN, RBRACE, SEMICOL, F64(1.0007), F64(9), I32(114514)]
     ,
   )
 }
