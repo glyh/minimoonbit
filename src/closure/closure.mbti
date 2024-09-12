@@ -31,13 +31,13 @@ pub enum Expr {
   FDiv(@minimbt.Name, @minimbt.Name)
   IfEq(@minimbt.Name, @minimbt.Name, Expr, Expr)
   IfLe(@minimbt.Name, @minimbt.Name, Expr, Expr)
-  Let(Tuple[@minimbt.Name, LowType], Expr, Expr)
+  Let((@minimbt.Name, LowType), Expr, Expr)
   Var(@minimbt.Name)
-  MakeClosure(Tuple[@minimbt.Name, LowType], Closure, Expr)
+  MakeClosure((@minimbt.Name, LowType), Closure, Expr)
   CallClosure(@minimbt.Name, Array[@minimbt.Name])
   CallDirect(Label, Array[@minimbt.Name])
   MakeTuple(Array[@minimbt.Name])
-  LetTuple(Array[Tuple[@minimbt.Name, LowType]], @minimbt.Name, Expr)
+  LetTuple(Array[(@minimbt.Name, LowType)], @minimbt.Name, Expr)
   ArrayGet(@minimbt.Name, @minimbt.Name)
   ArrayPut(@minimbt.Name, @minimbt.Name, @minimbt.Name)
   ExternalArray(Label)
@@ -50,8 +50,8 @@ pub struct FuncDef {
   pub name : Label
   pub old_name : @minimbt.Name
   pub ty : LowType
-  pub args : Array[Tuple[@minimbt.Name, LowType]]
-  pub formal_free_vars : Array[Tuple[@minimbt.Name, LowType]]
+  pub args : Array[(@minimbt.Name, LowType)]
+  pub formal_free_vars : Array[(@minimbt.Name, LowType)]
   pub body : Expr
 }
 impl FuncDef {

@@ -1,12 +1,71 @@
 package moonbitlang/minimbt/lex
 
 // Values
+fn lex_string(String) -> Array[(Token, Loc)]!
 
 // Types and methods
+pub type! ExpectLE
+
+type LexMode
+
+pub struct Loc {
+  pub row : Int
+  pub col : Int
+  pub index : Int
+}
+impl Loc {
+  to_string(Self) -> String
+}
+
+pub enum Token {
+  Let
+  ID(String)
+  COLON
+  ASSIGN
+  SEMICOL
+  FN
+  MAIN
+  INIT
+  LPAREN
+  RPAREN
+  ARROW
+  COMMA
+  LBRACE
+  RBRACE
+  EQ
+  LE
+  ADD
+  SUB
+  MUL
+  DIV
+  IF
+  ELSE
+  LBKT
+  RBKT
+  BOOL(Bool)
+  DOT
+  ARRAY
+  MAKE
+  UNIT_T
+  BOOL_T
+  DOUBLE_T
+  INT(Int)
+  NOT
+  INT_T
+  LET
+}
+impl Token {
+  to_string(Self) -> String
+}
+
+pub type! UnexpectedChar Char
 
 // Type aliases
 
 // Traits
 
 // Extension Methods
+impl Show for Loc
+
+impl Show for Token
 

@@ -1,3 +1,5 @@
+//: vim: set syntax=antlr:
+
 grammar MiniMoonBit;
 
 prog: top_level* EOF;

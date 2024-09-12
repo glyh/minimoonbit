@@ -9,7 +9,7 @@ alias @moonbitlang/minimbt as @minimbt
 pub struct FuncDef {
   pub name : @minimbt.Name
   pub ty : @minimbt.Type
-  pub args : Array[Tuple[@minimbt.Name, @minimbt.Type]]
+  pub args : Array[(@minimbt.Name, @minimbt.Type)]
   pub body : Knf
 }
 impl FuncDef {
@@ -33,12 +33,12 @@ pub enum Knf {
   FDiv(@minimbt.Name, @minimbt.Name)
   IfEq(@minimbt.Name, @minimbt.Name, Knf, Knf)
   IfLe(@minimbt.Name, @minimbt.Name, Knf, Knf)
-  Let(Tuple[@minimbt.Name, @minimbt.Type], Knf, Knf)
+  Let((@minimbt.Name, @minimbt.Type), Knf, Knf)
   Var(@minimbt.Name)
   LetRec(FuncDef, Knf)
   Apply(@minimbt.Name, Array[@minimbt.Name])
   Tuple(Array[@minimbt.Name])
-  LetTuple(Array[Tuple[@minimbt.Name, @minimbt.Type]], @minimbt.Name, Knf)
+  LetTuple(Array[(@minimbt.Name, @minimbt.Type)], @minimbt.Name, Knf)
   Get(@minimbt.Name, @minimbt.Name)
   Put(@minimbt.Name, @minimbt.Name, @minimbt.Name)
   ExternalArray(@minimbt.Name)
