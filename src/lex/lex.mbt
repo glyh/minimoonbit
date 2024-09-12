@@ -16,7 +16,7 @@ fn advance(self : Loc, c : Char) -> Loc {
   if c == '\n' {
     self.advance_line()
   } else {
-    { ..self, col: self.col + 1 }
+    { ..self, col: self.col + 1, index: self.index + 1 }
   }
 }
 
@@ -223,11 +223,29 @@ pub fn lex_string!(input : String) -> Array[(Token, Loc)] {
   result
 }
 
+fn fst[U, V](pair : (U, V)) -> U {
+  match pair {
+    (a, _) => a
+  }
+}
+
 test "simple lexing" {
   inspect!(
-    lex_string!("1, 2, 3"),
+    lex_string!(
+      #|fn make_adder(x: Int) -> (Int) -> Int {
+      #|  fn adder(y: Int) -> Int {
+      #|    x + y
+      #|  };
+      #|  adder
+      #|};
+      #|
+      #|fn main {
+      #|  print_int((make_adder(3))(7))
+      #|};
+      ,
+    ).map(fst),
     content=
-      #|[INT(1), COMMA, INT(2), COMMA, INT(3)]
+      #|[FN, ID("make_adder"), LPAREN, ID("x"), COLON, INT_T, RPAREN, ARROW, LPAREN, INT_T, RPAREN, ARROW, INT_T, LBRACE, FN, ID("adder"), LPAREN, ID("y"), COLON, INT_T, RPAREN, ARROW, INT_T, LBRACE, ID("x"), ADD, ID("y"), RBRACE, SEMICOL, ID("adder"), RBRACE, SEMICOL, FN, ID("main"), LBRACE, ID("print_int"), LPAREN, LPAREN, ID("make_adder"), LPAREN, INT(3), RPAREN, RPAREN, LPAREN, INT(7), RPAREN, RPAREN, RBRACE, SEMICOL]
     ,
   )
 }
