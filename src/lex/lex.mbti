@@ -6,7 +6,7 @@ fn lex_string(String) -> Array[(Token, Loc)]!
 // Types and methods
 pub type! ExpectLE
 
-type LexMode
+type LexState
 
 pub struct Loc {
   pub row : Int
