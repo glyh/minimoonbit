@@ -1,49 +1,222 @@
+/// The stage to be run next.
+enum Stages {
+  Parse
+  Typecheck
+  Knf
+  KnfOpt
+  Closure
+  Asm
+  Finished
+} derive(Show, Eq, Compare)
+
+fn Stages::from_string(s : String) -> Stages? {
+  match s {
+    "parse" => Some(Stages::Parse)
+    "typecheck" => Some(Stages::Typecheck)
+    "knf" => Some(Stages::Knf)
+    "knf-opt" => Some(Stages::KnfOpt)
+    "closure" => Some(Stages::Closure)
+    "riscv" => Some(Stages::Asm)
+    "finished" => Some(Stages::Finished)
+    _ => None
+  }
+}
+
+fn Stages::next(self : Stages) -> Stages {
+  match self {
+    Stages::Parse => Stages::Typecheck
+    Stages::Typecheck => Stages::Knf
+    Stages::Knf => Stages::KnfOpt
+    Stages::KnfOpt => Stages::Closure
+    Stages::Closure => @util.die("TODO")
+    Stages::Asm => Stages::Finished
+    Stages::Finished => Stages::Finished
+  }
+}
+
+struct CompileStatus {
+  mut curr_stage : Stages
+  end_stage : Stages
+  mut source_code : String?
+  mut ast : @types.Syntax?
+  mut typechecked : @types.Syntax?
+  knf_env : @knf.KnfEnv
+  mut knf : @knf.Knf?
+  mut opt_knf : @knf.Knf?
+  mut closure_ir : @closure.Program?
+  mut asm : Array[@riscv.AssemblyFunction]?
+}
+
+fn CompileStatus::initialize(
+  start_stage : Stages,
+  end_stage : Stages,
+  file : String
+) -> CompileStatus! {
+  let v = CompileStatus::{
+    curr_stage: start_stage,
+    end_stage,
+    source_code: None,
+    ast: None,
+    typechecked: None,
+    knf_env: @knf.KnfEnv::new(externals()),
+    knf: None,
+    opt_knf: None,
+    closure_ir: None,
+    asm: None,
+  }
+  match start_stage {
+    Parse => v.source_code = Some(file)
+    Typecheck => v.ast = Some(@types.Syntax::from_json!(@json.parse!(file)))
+    Knf => v.typechecked = Some(@types.Syntax::from_json!(@json.parse!(file)))
+    KnfOpt => {
+      v.knf = Some(@knf.Knf::from_json!(@json.parse!(file)))
+      v.knf_env.init_counter_from_existing(v.knf.unwrap())
+    }
+    Closure => {
+      v.opt_knf = Some(@knf.Knf::from_json!(@json.parse!(file)))
+      v.knf_env.init_counter_from_existing(v.opt_knf.unwrap())
+    }
+    _ => fail!("invalid start stage")
+  }
+  v
+}
+
+/// Run the next stage of compilation. Returns true if the compilation is finished.
+fn CompileStatus::step(self : CompileStatus) -> Bool {
+  if self.curr_stage >= self.end_stage {
+    return true
+  }
+  match self.curr_stage {
+    Parse => {
+      let source_code = self.source_code.unwrap()
+      let parsed = @util.die("TODO: parse")
+      self.ast = Some(parsed)
+    }
+    Typecheck => {
+      let typechecked = @util.die("TODO: typecheck")
+      self.typechecked = Some(typechecked)
+    }
+    Knf => {
+      let knf = self.knf_env.to_knf(self.typechecked.unwrap())
+      self.knf = Some(knf)
+    }
+    KnfOpt => {
+      let knf = self.knf.unwrap()
+      // TODO: optimize
+      self.opt_knf = Some(knf)
+    }
+    Closure => {
+      let closure_ir = @closure.knf_program_to_closure(
+        self.opt_knf.unwrap(),
+        Map::from_iter(externals().iter()),
+      )
+      self.closure_ir = Some(closure_ir)
+    }
+    Asm => {
+      let real_asm = @riscv.emit(@util.die("TODO"))
+      self.asm = Some(real_asm)
+    }
+    Finished => ()
+  }
+  self.curr_stage = self.curr_stage.next()
+  self.curr_stage >= self.end_stage
+}
+
+fn CompileStatus::output(self : CompileStatus, json : Bool) -> String {
+  if json {
+    match self.curr_stage {
+      Parse => self.source_code.unwrap()
+      Typecheck => @json.stringify(self.ast.unwrap().to_json())
+      Knf => @json.stringify(self.typechecked.unwrap().to_json())
+      KnfOpt => @json.stringify(self.knf.unwrap().to_json())
+      Closure => @json.stringify(self.opt_knf.unwrap().to_json())
+      Asm => @util.die("TODO")
+      Finished => @riscv.print_functions(self.asm.unwrap())
+    }
+  } else {
+    match self.curr_stage {
+      Parse => self.source_code.unwrap()
+      Typecheck => self.ast.unwrap().to_string()
+      Knf => self.typechecked.unwrap().to_string()
+      KnfOpt => self.knf.unwrap().to_string()
+      Closure => self.opt_knf.unwrap().to_string()
+      Asm => @util.die("TODO")
+      Finished => @riscv.print_functions(self.asm.unwrap())
+    }
+  }
+}
+
 fn main {
   let argv = @env.get_args()
   let mut file = None
-  let no_run = Ref::new(false)
-  let print_ast = Ref::new(false)
-  let print_knf = Ref::new(false)
-  let print_each_knf = Ref::new(false)
-  let print_final_knf = Ref::new(false)
-  let print_closure_ir = Ref::new(false)
-  let print_asm = Ref::new(false)
   let knf_opt_iters = Ref::new(10)
-  let run_with_interpreter = Ref::new(false)
-  let stop_after_parse = Ref::new(false)
-  let stop_after_typecheck = Ref::new(false)
+  let knf_opt_inline_threshold = Ref::new(10)
+
+  // Testing directives
+  let json = Ref::new(false)
+  let start_stage = Ref::new(Stages::Parse)
+  let end_stage = Ref::new(Stages::Finished)
   let knf_interpreter = Ref::new(false)
   let closure_interpreter = Ref::new(false)
+  let out_file = Ref::new("-")
+  let print = Ref::new([])
+
+  // 
   @ArgParser.parse(
     [
       (
-        "--interpret",
-        "-i",
-        @ArgParser.Set(run_with_interpreter),
-        "Run with interpreter",
-      ),
-      ("--print-ast", "", @ArgParser.Set(print_ast), "Print AST"),
-      ("--no-run", "", @ArgParser.Set(no_run), "Do not run the program"),
-      ("--print-knf", "", @ArgParser.Set(print_knf), "Print initial KNF"),
-      (
-        "--print-each-knf",
+        "--start-stage",
         "",
-        @ArgParser.Set(print_each_knf),
-        "Print each KNF in optimization",
+        @ArgParser.String(
+          fn(s) {
+            match Stages::from_string(s) {
+              Some(stage) => start_stage.val = stage
+              None => @util.die("Invalid stage")
+            }
+          },
+        ),
+        "Start stage",
       ),
       (
-        "--print-final-knf",
+        "--end-stage",
         "",
-        @ArgParser.Set(print_final_knf),
-        "Print final KNF",
+        @ArgParser.String(
+          fn(s) {
+            match Stages::from_string(s) {
+              Some(stage) => end_stage.val = stage
+              None => @util.die("Invalid stage")
+            }
+          },
+        ),
+        "End stage",
       ),
       (
-        "--print-closure-ir",
+        "--knf-interpreter",
         "",
-        @ArgParser.Set(print_closure_ir),
-        "Print closure IR",
+        @ArgParser.Set(knf_interpreter),
+        "Run with KNF interpreter",
       ),
-      ("--print-asm", "", @ArgParser.Set(print_asm), "Print assembly"),
+      (
+        "--closure-interpreter",
+        "",
+        @ArgParser.Set(closure_interpreter),
+        "Run with closure interpreter",
+      ),
+      (
+        "--out-file",
+        "-o",
+        @ArgParser.String(fn(s) { out_file.val = s }),
+        "Output file",
+      ),
+      ("--json", "", @ArgParser.Set(json), "Print results as JSON"),
+
+      // Regular directives
+      (
+        "--print",
+        "",
+        @ArgParser.String(fn(s) { print.val = s.split(",").collect() }),
+        "",
+      ),
       (
         "--knf-opt-iters",
         "N",
@@ -59,28 +232,18 @@ fn main {
         "Number of optimization iterations",
       ),
       (
-        "--stop-after-parse",
-        "",
-        @ArgParser.Set(stop_after_parse),
-        "Stop after parse",
-      ),
-      (
-        "--stop-after-typecheck",
-        "",
-        @ArgParser.Set(stop_after_typecheck),
-        "Stop after typecheck",
-      ),
-      (
-        "--knf-interpreter",
-        "",
-        @ArgParser.Set(knf_interpreter),
-        "KNF interpreter",
-      ),
-      (
-        "--closure-interpreter",
-        "",
-        @ArgParser.Set(closure_interpreter),
-        "Closure interpreter",
+        "--knf-opt-inline-threshold",
+        "N",
+        @ArgParser.String(
+          fn(s) {
+            let i = @strconv.parse_int?(s)
+            match i {
+              Ok(i) => knf_opt_inline_threshold.val = i
+              Err(e) => @util.die("Invalid number")
+            }
+          },
+        ),
+        "Inline threshold for KNF optimization",
       ),
     ],
     fn(s) {
@@ -93,196 +256,80 @@ fn main {
     argv,
   )
 
+  // Configure pipeline
+  if knf_interpreter.val {
+    end_stage.val = Stages::Knf
+  }
+  if closure_interpreter.val {
+    end_stage.val = Stages::Closure
+  }
+  let stages_to_print = print.val.map(
+    fn(s) {
+      match Stages::from_string(s) {
+        Some(stage) => stage
+        None => @util.die("Invalid stage to print: \{s}")
+      }
+    },
+  )
+
   // Input
   let file = if file.is_empty() {
-    println("no input file")
-    @util.die("no input file")
+    @util.die("no input file provided")
   } else {
     file.unwrap()
   }
   let contents = @fs.read_to_string(file)
-  let typechecked = to_typecheked(contents)
-  if print_ast.val {
-    println(typechecked.to_string())
+
+  // Compilation
+  let status = match
+    CompileStatus::initialize?(start_stage.val, end_stage.val.next(), contents) {
+    Ok(status) => status
+    Err(e) => {
+      println(e)
+      @util.die("Initialization error")
+    }
   }
 
-  // To KNF
-  let external_fns = externals()
-  let knf_env = @knf.KnfEnv::new(external_fns)
-  let knf = knf_env.to_knf(typechecked)
-  if print_knf.val {
-    println("Initial KNF:")
-    println(knf.to_pretty_print())
-  }
-
-  // Optimization
-  let mut knf = knf
-  for i = 0; i < knf_opt_iters.val; i = i + 1 {
-    let new_knf = knf_env.opt_pass(knf)
-    if new_knf == knf {
+  // Run stages
+  while true {
+    let stg = status.curr_stage
+    let stop = status.step()
+    if stages_to_print.contains(stg) {
+      println("Stage: \{stg}")
+      println(status.output(json.val))
+    }
+    if stop {
       break
     }
-    knf = new_knf
-    if print_each_knf.val {
-      println("KNF Iteration \{i}:")
-      println(knf.to_pretty_print())
-    }
-  }
-  if print_final_knf.val || no_run.val {
-    println("Final KNF:")
-    println(knf.to_pretty_print())
   }
 
-  // Interpretation
-  if run_with_interpreter.val {
-    if no_run.val {
-      return
-    }
-    let interpreter = @knf_eval.KnfInterpreter::new()
-    add_interpreter_fns(interpreter)
-    let _result = match interpreter.eval_full?(knf) {
-      Ok(result) => result
+  // Output
+  if knf_interpreter.val {
+    let knfi = @knf_eval.KnfInterpreter::new()
+    add_interpreter_fns(knfi)
+    match knfi.eval_full?(status.knf.unwrap()) {
+      Ok(_) => ()
       Err(Failure(e)) => {
-        println("Error: " + e)
-        @util.die("Evaluation error")
+        println(e)
+        @util.die("KNF interpreter error")
       }
     }
-    return
-  }
-
-  // KNF to closure
-  let closure_ir = @closure.knf_program_to_closure(
-    knf,
-    Map::from_iter(external_fns.iter()),
-  )
-  if print_closure_ir.val {
-    println("Closure IR:")
-    println(closure_ir.to_string())
-  }
-
-  // Fill in the holes here!
-
-  // Code generation
-  let real_asm = @riscv.emit(abort("TODO"))
-
-  // Print asm
-  for asm in real_asm {
-    println(asm)
-    println("")
-  }
-}
-
-fn to_typecheked(source : String) -> @types.Syntax {
-  abort("todo")
-}
-
-fn add_interpreter_fns(interpreter : @knf_eval.KnfInterpreter) -> Unit {
-  interpreter.add_extern_fn(
-    "print_int",
-    fn(args) {
-      match args[0] {
-        Int(i) => @io.print(i)
-        _ => @util.die("print_int expects Int")
+  } else if closure_interpreter.val {
+    let clsi = @closure_eval.ClosureInterpreter::new()
+    add_closure_interpreter_fns(clsi)
+    match clsi.eval_full?(status.closure_ir.unwrap()) {
+      Ok(_) => ()
+      Err(Failure(e)) => {
+        println(e)
+        @util.die("Closure interpreter error")
       }
-      Unit
-    },
-  )
-  interpreter.add_extern_fn(
-    "print_endline",
-    fn(_args) {
-      @io.print("\n")
-      Unit
-    },
-  )
-  let create_array = fn(args : Array[@knf_eval.Value]) {
-    match args[0] {
-      Int(n) => @knf_eval.Value::Array(Array::make(n, args[1]))
-      _ => @util.die("create_array expects Int")
+    }
+  } else {
+    let out_string = status.output(json.val)
+    if out_file.val == "-" {
+      println(out_string)
+    } else {
+      @fs.write_to_string(out_file.val, out_string)
     }
   }
-  interpreter.add_extern_fn("create_array", create_array)
-  interpreter.add_extern_fn("create_float_array", create_array)
-  interpreter.add_extern_fn("create_ptr_array", create_array)
-  interpreter.add_extern_fn(
-    "truncate",
-    fn(args) {
-      match args[0] {
-        Double(d) => Int(d.to_int())
-        _ => @util.die("truncate expects Double")
-      }
-    },
-  )
-  interpreter.add_extern_fn(
-    "sin",
-    fn(args) {
-      match args[0] {
-        Double(d) => Double(@math.sin(d))
-        _ => @util.die("sin expects Double")
-      }
-    },
-  )
-  interpreter.add_extern_fn(
-    "cos",
-    fn(args) {
-      match args[0] {
-        Double(d) => Double(@math.cos(d))
-        _ => @util.die("cos expects Double")
-      }
-    },
-  )
-  interpreter.add_extern_fn(
-    "sqrt",
-    fn(args) {
-      match args[0] {
-        Double(d) => Double(d.sqrt())
-        _ => @util.die("sqrt expects Double")
-      }
-    },
-  )
-  interpreter.add_extern_fn(
-    "abs_float",
-    fn(args) {
-      match args[0] {
-        Double(d) => Double(@double.abs(d))
-        _ => @util.die("abs_float expects Double")
-      }
-    },
-  )
-  interpreter.add_extern_fn(
-    "int_of_float",
-    fn(args) {
-      match args[0] {
-        Double(d) => Int(d.to_int())
-        _ => @util.die("int_of_float expects Double")
-      }
-    },
-  )
-  interpreter.add_extern_fn(
-    "float_of_int",
-    fn(args) {
-      match args[0] {
-        Int(i) => Double(i.to_double())
-        _ => @util.die("float_of_int expects Int")
-      }
-    },
-  )
-}
-
-fn externals() -> @immut/hashmap.T[String, @types.Type] {
-  @immut/hashmap.T::new()
-  .add("print_int", @types.Fun([Int], Unit))
-  .add("print_endline", @types.Fun([], Unit))
-  .add("create_array", @types.Fun([Int, Int], @types.Type::Array(Int)))
-  .add(
-    "create_float_array",
-    @types.Fun([Int, Double], @types.Type::Array(Double)),
-  )
-  .add("create_ptr_array", @types.Fun([Int, Ptr], @types.Type::Array(Ptr)))
-  .add("truncate", @types.Fun([Double], Int))
-  .add("sin", @types.Fun([Double], Double))
-  .add("cos", @types.Fun([Double], Double))
-  .add("sqrt", @types.Fun([Double], Double))
-  .add("abs_float", @types.Fun([Double], Double))
-  .add("int_of_float", @types.Fun([Double], Int))
-  .add("float_of_int", @types.Fun([Int], Double))
 }
