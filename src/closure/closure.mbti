@@ -12,6 +12,8 @@ pub struct Closure {
   pub actual_free_vars : Array[@minimbt.Name]
 }
 impl Closure {
+  from_json(Json) -> Self!
+  to_json(Self) -> Json
   to_string(Self) -> String
 }
 
@@ -43,18 +45,23 @@ pub enum Expr {
   ExternalArray(Label)
 }
 impl Expr {
+  from_json(Json) -> Self!
+  to_json(Self) -> Json
   to_string(Self) -> String
 }
 
 pub struct FuncDef {
   pub name : Label
   pub old_name : @minimbt.Name
+  pub is_closure : Bool
   pub ty : LowType
   pub args : Array[(@minimbt.Name, LowType)]
   pub formal_free_vars : Array[(@minimbt.Name, LowType)]
   pub body : Expr
 }
 impl FuncDef {
+  from_json(Json) -> Self!
+  to_json(Self) -> Json
   to_string(Self) -> String
 }
 
@@ -75,9 +82,11 @@ pub enum LowType {
   Ptr
 }
 impl LowType {
+  from_json(Json) -> Self!
   is_float_like(Self) -> Bool
   is_ptr_like(Self) -> Bool
   size_of(Self, Int) -> Int
+  to_json(Self) -> Json
   to_string(Self) -> String
 }
 
@@ -86,6 +95,8 @@ pub struct Program {
   pub body : Expr
 }
 impl Program {
+  from_json(Json) -> Self!
+  to_json(Self) -> Json
   to_string(Self) -> String
 }
 

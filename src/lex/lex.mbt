@@ -25,7 +25,6 @@ fn advance_line(self : Loc) -> Loc {
 }
 
 pub enum Token {
-  Let
   ID(String)
   COLON
   ASSIGN

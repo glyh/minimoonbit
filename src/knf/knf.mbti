@@ -4,6 +4,7 @@ alias @moonbitlang/core/immut/hashmap as @hashmap
 alias @moonbitlang/minimbt as @minimbt
 
 // Values
+fn knf_max_counter(Knf) -> Int
 
 // Types and methods
 pub struct FuncDef {
@@ -13,7 +14,9 @@ pub struct FuncDef {
   pub body : Knf
 }
 impl FuncDef {
+  from_json(Json) -> Self!
   op_equal(Self, Self) -> Bool
+  to_json(Self) -> Json
   to_string(Self) -> String
 }
 
@@ -45,13 +48,16 @@ pub enum Knf {
   ExternalFunctionApplication(String, Array[@minimbt.Name])
 }
 impl Knf {
+  from_json(Json) -> Self!
   op_equal(Self, Self) -> Bool
+  to_json(Self) -> Json
   to_pretty_print(Self) -> PrettyKnf
   to_string(Self) -> String
 }
 
 type KnfEnv
 impl KnfEnv {
+  init_counter_from_existing(Self, Knf) -> Unit
   new(@hashmap.T[String, @minimbt.Type]) -> Self
   opt_pass(Self, Knf) -> Knf
   syntax_preprocess(Self, @minimbt.Syntax) -> @minimbt.Syntax

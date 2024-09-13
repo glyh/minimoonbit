@@ -18,7 +18,6 @@ impl Loc {
 }
 
 pub enum Token {
-  Let
   ID(String)
   COLON
   ASSIGN

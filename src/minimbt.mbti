@@ -29,11 +29,14 @@ pub struct Name {
 }
 impl Name {
   compare(Self, Self) -> Int
+  from_json(Json) -> Self!
+  from_string(String) -> Self!
   hash_combine(Self, Hasher) -> Unit
   name_and_slot(String, Int) -> Self
   name_only(String) -> Self
   op_equal(Self, Self) -> Bool
   slot_only(Int) -> Self
+  to_json(Self) -> Json
   to_string(Self) -> String
 }
 
