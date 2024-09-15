@@ -1,5 +1,3 @@
-//: vim: set syntax=antlr:
-
 grammar MiniMoonBit;
 
 prog: top_level* EOF;
@@ -40,6 +38,11 @@ stmt:
 	| fn_decl_stmt
 	| assign_stmt
 	| expr_stmt;
+
+/*
+stmt: 
+	((_let_tuple | _let_stmt | _fn_decl_stmt | _assign_stmt) ';')* expr
+*/
 
 let_tuple_stmt:
 	'let' '(' IDENTIFIER (',' IDENTIFIER)* ')' type_annotation? '=' expr ';'

@@ -1,7 +1,9 @@
 package moonbitlang/minimbt/lex
 
 // Values
-fn lex_string(String) -> Array[(Token, Loc)]!
+fn lex_string(String) -> Array[(Token, Loc, Loc)]!
+
+fn new_loc() -> Loc
 
 // Types and methods
 pub type! ExpectLE
@@ -55,6 +57,7 @@ pub enum Token {
   LET
 }
 impl Token {
+  op_equal(Self, Self) -> Bool
   to_string(Self) -> String
 }
 

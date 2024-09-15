@@ -8,7 +8,7 @@ pub type! ExpectLE
 
 pub type! UnexpectedChar Char
 
-fn new_loc() -> Loc {
+pub fn new_loc() -> Loc {
   { row: 1, col: 1, index: 0 }
 }
 
@@ -60,7 +60,7 @@ pub enum Token {
   NOT
   INT_T
   LET
-} derive(Show)
+} derive(Show, Eq)
 
 let reserved_keywords : @immut/hashmap.T[String, Token] = @immut/hashmap.of(
   [
@@ -72,10 +72,13 @@ let reserved_keywords : @immut/hashmap.T[String, Token] = @immut/hashmap.of(
     ("Double", DOUBLE_T),
     ("Array", ARRAY),
     ("not", NOT),
+    ("make", MAKE),
     ("if", IF),
     ("else", ELSE),
     ("fn", FN),
     ("let", LET),
+    ("main", MAIN),
+    ("init", INIT),
   ],
 )
 
@@ -109,8 +112,8 @@ enum LexState { // DFA State
   AfterFloatingDot
 }
 
-pub fn lex_string!(input : String) -> Array[(Token, Loc)] {
-  let result : Array[(Token, Loc)] = Array::new()
+pub fn lex_string!(input : String) -> Array[(Token, Loc, Loc)] {
+  let result : Array[(Token, Loc, Loc)] = Array::new()
   // put a new line here manually so we always spit the last token
   let chars = (input + "\n").iter().collect()
   let index_ub = chars.length()
@@ -156,7 +159,7 @@ pub fn lex_string!(input : String) -> Array[(Token, Loc)] {
           last_loc = loc
         } else {
           match symbols.find(char) {
-            Some(tok) => result.push((tok, loc))
+            Some(tok) => result.push((tok, loc, loc))
             None => raise UnexpectedChar(char)
           }
         }
@@ -170,7 +173,7 @@ pub fn lex_string!(input : String) -> Array[(Token, Loc)] {
       }
       (Number, _) => {
         mode = Default
-        result.push((I32(number_acc), last_loc))
+        result.push((I32(number_acc), last_loc, loc))
         number_acc = 0
         continue // don't consume
       }
@@ -184,7 +187,7 @@ pub fn lex_string!(input : String) -> Array[(Token, Loc)] {
       }
       (AfterFloatingDot, _) => {
         mode = Default
-        result.push((F64(number_acc_f64 / number_divdened_f64), last_loc))
+        result.push((F64(number_acc_f64 / number_divdened_f64), last_loc, loc))
         number_acc_f64 = 0
         number_divdened_f64 = 1
         continue // don't consume
@@ -203,40 +206,40 @@ pub fn lex_string!(input : String) -> Array[(Token, Loc)] {
             Some(tok) => tok
             None => ID(ident_or_keyword)
           }
-          result.push((to_push, last_loc))
+          result.push((to_push, last_loc, loc))
           ident_acc.reset()
           continue // don't consume
         }
       }
       (AfterAssign, '=') => {
         mode = Default
-        result.push((EQ, last_loc))
+        result.push((EQ, last_loc, loc))
         last_loc = loc
       }
       (AfterAssign, _) => {
         mode = Default
         last_loc = loc
-        result.push((ASSIGN, last_loc))
+        result.push((ASSIGN, last_loc, loc))
         continue // don' consume
       }
       (AfterDiv, '/') => mode = Comment
       (AfterDiv, _) => {
         mode = Default
-        result.push((DIV, last_loc))
+        result.push((DIV, last_loc, loc))
         continue // don' consume
       }
       (AfterLess, '=') => {
         mode = Default
-        result.push((LE, last_loc))
+        result.push((LE, last_loc, loc))
       }
       (AfterLess, _) => raise ExpectLE
       (AfterMinus, '>') => {
         mode = Default
-        result.push((ARROW, last_loc))
+        result.push((ARROW, last_loc, loc))
       }
       (AfterMinus, _) => {
         mode = Default
-        result.push((SUB, last_loc))
+        result.push((SUB, last_loc, loc))
         continue
       }
     }
@@ -245,9 +248,9 @@ pub fn lex_string!(input : String) -> Array[(Token, Loc)] {
   result
 }
 
-fn fst[U, V](pair : (U, V)) -> U {
+fn fst[U, V, W](pair : (U, V, W)) -> U {
   match pair {
-    (a, _) => a
+    (a, _, _) => a
   }
 }
 
@@ -265,11 +268,11 @@ test "simple lexing" {
       #|  print_int((make_adder(3))(7))
       #|};
       #| 1.0007 9.
-      #| 114514
+      #| 3129387129
       ,
     ).map(fst),
     content=
-      #|[FN, ID("make_adder"), LPAREN, ID("x"), COLON, INT_T, RPAREN, ARROW, LPAREN, INT_T, RPAREN, ARROW, INT_T, LBRACE, FN, ID("adder"), LPAREN, ID("y"), COLON, INT_T, RPAREN, ARROW, INT_T, LBRACE, ID("x"), ADD, ID("y"), RBRACE, SEMICOL, ID("adder"), RBRACE, SEMICOL, FN, ID("main"), LBRACE, ID("print_int"), LPAREN, LPAREN, ID("make_adder"), LPAREN, I32(3), RPAREN, RPAREN, LPAREN, I32(7), RPAREN, RPAREN, RBRACE, SEMICOL, F64(1.0007), F64(9), I32(114514)]
+      #|[FN, ID("make_adder"), LPAREN, ID("x"), COLON, INT_T, RPAREN, ARROW, LPAREN, INT_T, RPAREN, ARROW, INT_T, LBRACE, FN, ID("adder"), LPAREN, ID("y"), COLON, INT_T, RPAREN, ARROW, INT_T, LBRACE, ID("x"), ADD, ID("y"), RBRACE, SEMICOL, ID("adder"), RBRACE, SEMICOL, FN, MAIN, LBRACE, ID("print_int"), LPAREN, LPAREN, ID("make_adder"), LPAREN, I32(3), RPAREN, RPAREN, LPAREN, I32(7), RPAREN, RPAREN, RBRACE, SEMICOL, F64(1.0007), F64(9), I32(3129387129)]
     ,
   )
 }
