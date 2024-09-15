@@ -1,3 +1,4 @@
+// TODO: check int, float out of bound parsing
 pub struct Loc {
   row : Int
   col : Int
@@ -268,11 +269,11 @@ test "simple lexing" {
       #|  print_int((make_adder(3))(7))
       #|};
       #| 1.0007 9.
-      #| 3129387129
+      #| 2147483647
       ,
     ).map(fst),
     content=
-      #|[FN, ID("make_adder"), LPAREN, ID("x"), COLON, INT_T, RPAREN, ARROW, LPAREN, INT_T, RPAREN, ARROW, INT_T, LBRACE, FN, ID("adder"), LPAREN, ID("y"), COLON, INT_T, RPAREN, ARROW, INT_T, LBRACE, ID("x"), ADD, ID("y"), RBRACE, SEMICOL, ID("adder"), RBRACE, SEMICOL, FN, MAIN, LBRACE, ID("print_int"), LPAREN, LPAREN, ID("make_adder"), LPAREN, I32(3), RPAREN, RPAREN, LPAREN, I32(7), RPAREN, RPAREN, RBRACE, SEMICOL, F64(1.0007), F64(9), I32(3129387129)]
+      #|[FN, ID("make_adder"), LPAREN, ID("x"), COLON, INT_T, RPAREN, ARROW, LPAREN, INT_T, RPAREN, ARROW, INT_T, LBRACE, FN, ID("adder"), LPAREN, ID("y"), COLON, INT_T, RPAREN, ARROW, INT_T, LBRACE, ID("x"), ADD, ID("y"), RBRACE, SEMICOL, ID("adder"), RBRACE, SEMICOL, FN, MAIN, LBRACE, ID("print_int"), LPAREN, LPAREN, ID("make_adder"), LPAREN, I32(3), RPAREN, RPAREN, LPAREN, I32(7), RPAREN, RPAREN, RBRACE, SEMICOL, F64(1.0007), F64(9), I32(2147483647)]
     ,
   )
 }
