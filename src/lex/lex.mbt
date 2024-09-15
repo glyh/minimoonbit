@@ -1,3 +1,4 @@
+// An O(N) lexer
 // TODO: check int, float out of bound parsing
 pub struct Loc {
   row : Int
@@ -5,9 +6,12 @@ pub struct Loc {
   index : Int
 } derive(Show)
 
-pub type! ExpectLE
+pub enum LexError_ {
+  ExpectLE
+  UnexpectedChar(Char)
+} derive(Show)
 
-pub type! UnexpectedChar Char
+pub type! LexError LexError_
 
 pub fn new_loc() -> Loc {
   { row: 1, col: 1, index: 0 }
@@ -113,7 +117,7 @@ enum LexState { // DFA State
   AfterFloatingDot
 }
 
-pub fn lex_string!(input : String) -> Array[(Token, Loc, Loc)] {
+pub fn lex_string(input : String) -> Array[(Token, Loc, Loc)]!LexError {
   let result : Array[(Token, Loc, Loc)] = Array::new()
   // put a new line here manually so we always spit the last token
   let chars = (input + "\n").iter().collect()
@@ -161,7 +165,7 @@ pub fn lex_string!(input : String) -> Array[(Token, Loc, Loc)] {
         } else {
           match symbols.find(char) {
             Some(tok) => result.push((tok, loc, loc))
-            None => raise UnexpectedChar(char)
+            None => raise LexError(UnexpectedChar(char))
           }
         }
       }
@@ -233,7 +237,7 @@ pub fn lex_string!(input : String) -> Array[(Token, Loc, Loc)] {
         mode = Default
         result.push((LE, last_loc, loc))
       }
-      (AfterLess, _) => raise ExpectLE
+      (AfterLess, _) => raise LexError(ExpectLE)
       (AfterMinus, '>') => {
         mode = Default
         result.push((ARROW, last_loc, loc))

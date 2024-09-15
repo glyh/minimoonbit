@@ -1,105 +1,24 @@
 // According to https://taolun.moonbitlang.com/t/topic/882/2, we don't have GADT, so I have to hand roll like below
 
-struct Ann {
-  src_start : @lex.Loc
-  src_end : @lex.Loc?
-}
+let recoverable_errors : Array[ParseError] = []
 
-type Program Array[Top]
-
-type! ParseError {
-  Unexpected((@lex.Token, @lex.Loc, @lex.Loc))
-  EarlyEOF
-  Missing(@lex.Token, @lex.Loc)
-  ExpectButEOF(@lex.Token)
-  Unreachable
-}
-
-enum TopNaked {
-  LetDecl(ID, Type, Exp)
-  FnDecl(ID, Result[Array[(ID, Type)], ParseError], Type, Stmt)
-  MainDecl(ID, Stmt)
-  InitDecl(ID, Stmt)
-}
-
-type Top Result[(TopNaked, Ann), ParseError]
-
-type ID Result[(String, Ann), ParseError]
-
-enum StmtHeadNaked {
-  LetTuple(Array[ID], Type?, Exp)
-  Let(ID, Type?, Exp)
-  NontopFn(ID, Array[(ID, Type?)], Type?, Stmt)
-  Assign(Exp, Exp)
-}
-
-type StmtHead Result[(StmtHeadNaked, Ann), ParseError]
-
-type Stmt Result[(Array[StmtHead], Exp, Ann), ParseError]
-
-enum Value {
-  I32(Int)
-  F64(Double)
-  Bool(Bool)
-  Unit
-}
-
-enum Unop {
-  Not
-  Neg
-}
-
-enum BinopTag {
-  Eq
-  Le
-  Add
-  Sub
-  Mul
-  Div
-}
-
-type Binop Result[(BinopTag, Ann), ParseError]
-
-enum ExpNaked {
-  Atom(Value)
-  Tuple(Array[Exp])
-  Block(Stmt)
-  Unary(Unop, Exp)
-  Binary(Binop, Exp, Exp)
-  Apply(Exp, Array[Exp]) // we need at least 2 expression to perform an apply
-  If(Exp, Stmt, Stmt?)
-  Index(Exp, Exp)
-  Var(ID)
-  MakeArray(Exp, Exp)
-}
-
-type Exp Result[(ExpNaked, Ann), ParseError]
-
-enum TypeNaked {
-  TUnit
-  TBool
-  TInt
-  TDouble
-  TArray(Type)
-  TTuple(Array[Type])
-  TFunction(Array[Type], Type)
-}
-
-type Type Result[(TypeNaked, Ann), ParseError]
-
-pub let recoverable_errors : Array[ParseError] = []
-
-pub fn program(view : ArrayView[(@lex.Token, @lex.Loc, @lex.Loc)]) -> Program {
+fn program(view : ArrayView[(@lex.Token, @lex.Loc, @lex.Loc)]) -> Program {
   let program : Program = []
   let mut view = view
   while true {
     match view {
-      [(@lex.FN, _, _), ..] => {
+      [(@lex.FN, all_start, _) as tok, ..] => {
+        if all_start.col != 1 { // in grammar file it's enforced all top levels start at the beginning of line
+          recoverable_errors.push(TopLevelNotColNot1(tok))
+        }
         let (top_fn, rest) = top_fn(view)
         program._.push(top_fn)
         view = rest
       }
-      [(@lex.LET, _, _), ..] => {
+      [(@lex.LET, all_start, _) as tok, ..] => {
+        if all_start.col != 1 {
+          recoverable_errors.push(TopLevelNotColNot1(tok))
+        }
         let (top_let, rest) = top_let(view)
         program._.push(top_let)
         view = rest
@@ -170,29 +89,13 @@ fn top_fn(
     let (fn_body, view) = stmt(view) // { body }
     let (_, view) = consume(@lex.RBRACE, view)
     let (all_end, view) = consume(@lex.SEMICOL, view)
-    (
-      Ok(
-        (
-          MainDecl(Ok(name), fn_body),
-          { src_start: all_start, src_end: all_end },
-        ),
-      ),
-      view,
-    )
+    (Ok((MainDecl(fn_body), { src_start: all_start, src_end: all_end })), view)
   } else if name.0 == "init" {
     let (_, view) = consume(@lex.LBRACE, view)
     let (fn_body, view) = stmt(view) // { body }
     let (_, view) = consume(@lex.RBRACE, view)
     let (all_end, view) = consume(@lex.SEMICOL, view)
-    (
-      Ok(
-        (
-          InitDecl(Ok(name), fn_body),
-          { src_start: all_start, src_end: all_end },
-        ),
-      ),
-      view,
-    )
+    (Ok((InitDecl(fn_body), { src_start: all_start, src_end: all_end })), view)
   } else {
     let (params, view) = params_typed(view) // (x1, x2, x3)
     let (_, view) = consume(@lex.ARROW, view)
@@ -431,47 +334,41 @@ fn stmt(
       }
     [(@lex.FN, all_start, _), .. as view] => {
       let (fn_id, view) = id(view)
+      let (_, view) = consume(@lex.LPAREN, view)
       let params : Array[(ID, Type?)] = []
       let view = loop view {
         [(@lex.RPAREN, _, _), .. as view] => break view
-        [(@lex.ID(_), _, _), ..] => {
+        view => {
           let (param_id, view) = id(view)
-          let (id_ty, view) = match view {
+          let (param_ty, view) = match view {
             [(@lex.RPAREN, _, _), ..] => (None, view) // don't consume RPAREN
             [(@lex.COMMA, _, _), .. as view] => (None, view)
+            [] as view => {
+              params.push((Err(EarlyEOF), None))
+              break view
+            }
             view => {
               let (_, view) = consume(@lex.COLON, view)
               let (ty, view) = _type(view)
-              let (_, view) = consume(@lex.COMMA, view)
               (Some(ty), view)
             }
           }
-          params.push((param_id, id_ty))
+          params.push((param_id, param_ty))
           continue view
-        }
-        [(tok, s, e), .. as view] => {
-          params.push((Err(Unexpected((tok, s, e))), None))
-          break view
-        }
-        [] => {
-          params.push((Err(EarlyEOF), None))
-          break view
         }
       }
       let (return_ty, view) = match view {
         [(@lex.ARROW, _, _), .. as view] => {
           let (ty, view) = _type(view)
-          let (_, view) = consume(@lex.EQ, view)
           (Some(ty), view)
         }
-        view => {
-          let (_, view) = consume(@lex.EQ, view)
-          (None, view)
-        }
+        view => (None, view)
       }
       let (_, view) = consume(@lex.LBRACE, view)
       let (stmt, view) = stmt(view)
-      let (all_end, view) = consume(@lex.RBRACE, view)
+      let (_, view) = consume(@lex.RBRACE, view)
+      let (all_end, view) = consume(@lex.SEMICOL, view)
+      //return (Err(EarlyEOF), view)
       non_exp_stmts.push(
         Ok(
           (
@@ -482,7 +379,7 @@ fn stmt(
       )
       continue view
     }
-    [(_, all_start, _), ..] => {
+    [(_, all_start, _), ..] as view => {
       // consumes expression
       let (value_exp, view) = expression(view)
       match view {
@@ -664,9 +561,9 @@ fn get_apply_expr(
           }
           _view =>
             while true {
-              let (exp, _view) = expression(view)
+              let (exp, _view) = expression(_view)
               params.push(exp)
-              match view {
+              match _view {
                 [(@lex.COMMA, _, _), .. as _view] => {
                   view = _view
                   continue
@@ -717,15 +614,21 @@ fn value_expr(
           }
         }
       }
-      (Ok((Tuple(tuple), { src_start: all_start, src_end: all_end })), view)
+      match tuple {
+        [single] => (single, view)
+        _ =>
+          (Ok((Tuple(tuple), { src_start: all_start, src_end: all_end })), view)
+      }
     }
     [(@lex.BOOL(b), all_start, all_end), .. as view] =>
       (
         Ok((Atom(Bool(b)), { src_start: all_start, src_end: Some(all_end) })),
         view,
       )
-    [(@lex.ID(_), _, _)] as view => {
+    [(@lex.ID(_), _, _), ..] as view => {
       let (_id, view) = id(view)
+      //let dummy_ann = { src_start: @lex.new_loc(), src_end: None }
+      //(Ok((Var(Ok(("wow", dummy_ann))), dummy_ann)), view)
       match _id._ {
         Ok((_, ann)) => (Ok((Var(_id), ann)), view)
         Err(err) => (Err(err), view)
@@ -792,19 +695,4 @@ fn value_expr(
     [(tok, s, e), .. as view] => (Err(Unexpected((tok, s, e))), view)
     [] => (Err(EarlyEOF), view)
   }
-}
-
-test "array is mutable" {
-  let a = [1, 2, 3]
-  (fn(arr : Array[Int]) {
-    arr[0] = 3
-    ignore(arr.pop())
-  })(a)
-  assert_eq!(a, [3, 2])
-}
-
-test "deque is mutable" {
-  let q : @deque.T[Int] = @deque.of([1, 2, 3])
-  (fn(q : @deque.T[Int]) { ignore(q.pop_back()) })(q)
-  assert_eq!(q.iter().collect(), [1, 2])
 }

@@ -24,6 +24,8 @@ pub enum Token {
   COLON
   ASSIGN
   SEMICOL
+  FN0
+  LET0
   FN
   MAIN
   INIT
