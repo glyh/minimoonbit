@@ -217,10 +217,12 @@ fn parser() -> PS {
       },
       get_or_apply,
       tok(@lex.ASSIGN) >> ref(expr_ref),
-    ) +
-    ref(expr_ref).map(
-      fn { exp => fn(rest) { S::Let(("_", fix_type(None)), exp, rest) } },
     )
+  // To support sequencing exps:
+  //+
+  //ref(expr_ref).map(
+  //  fn { exp => fn(rest) { S::Let(("_", fix_type(None)), exp, rest) } },
+  //)
   stmt_ref.val = fold_right(
     ref(expr_ref),
     nontop_head,
