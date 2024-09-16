@@ -136,3 +136,17 @@ test "nested fns" {
     ,
   )
 }
+
+test "no param fn type" {
+  let src =
+    #|fn wat() -> () -> Int {
+    #|  fn a() { 1 };
+    #|  a
+    #|};
+  inspect!(
+    parse_program(src),
+    content=
+      #|LetRec({name: ("wat", Fun([], Int)), args: [], body: LetRec({name: ("a", Var({val: None})), args: [], body: Int(1)}, Var("a"))}, Unit)
+    ,
+  )
+}

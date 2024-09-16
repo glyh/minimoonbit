@@ -1,5 +1,5 @@
 fn no_ann() -> Unit {
-  fn main() { () };
+  fn main() { fn lol(){ {fn wat(){()}; 1} }; 3 };
   fn a(u: Int, v: Int, w) -> Int {
     fn init() { () };
     fn b(x: Bool, y, z: Bool) {
@@ -15,7 +15,7 @@ fn no_ann() -> Unit {
     -> ((Unit) -> Int) -> Int {
       fn d(x: Bool, y: Int, z: Int) {
         let _ = not(not(not(x)));
-        let _ = -----y <= y;
+        let _ = 3-----y <= y;
         let _ = y == y;
         let a = Array::make(10, 10);
         a[1] = 2;

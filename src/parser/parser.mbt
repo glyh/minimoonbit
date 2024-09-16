@@ -26,8 +26,7 @@ fn parser() -> PS {
 
   // Type
   let type_ref : Ref[PT] = { val: empty() }
-  type_ref.val = tok(@lex.UNIT_T).map(fn { _ => T::Unit }) +
-    tok(@lex.BOOL_T).map(fn { _ => T::Bool }) +
+  type_ref.val = tok(@lex.BOOL_T).map(fn { _ => T::Bool }) +
     tok(@lex.INT_T).map(fn { _ => T::Int }) +
     tok(@lex.DOUBLE_T).map(fn { _ => T::Double }) +
     (
@@ -38,9 +37,10 @@ fn parser() -> PS {
     ) +
     lift2(
       fn(args, ret) { T::Fun(args, ret) },
-      tok(@lex.LPAREN) >> sep_list1(tok(@lex.COMMA), ref(type_ref)),
+      tok(@lex.LPAREN) >> sep_list(tok(@lex.COMMA), ref(type_ref)),
       tok(@lex.RPAREN) >> tok(@lex.ARROW) >> ref(type_ref),
     ) +
+    tok(@lex.UNIT_T).map(fn { _ => T::Unit }) +
     (
       tok(@lex.LPAREN) >>
       sep_list1(tok(@lex.COMMA), ref(type_ref)).map(
