@@ -165,12 +165,6 @@ fn parser() -> PS {
       tok(@lex.LPAREN) >> sep_list(tok(@lex.COMMA), param) << tok(@lex.RPAREN),
       maybe(tok(@lex.ARROW) >> ref(type_ref)),
       block_expr,
-    )
-  let stmt_head = lift3(
-      fn(id, ty, body) { fn(rest) { S::Let((id, fix_type(ty)), body, rest) } },
-      tok(@lex.LET) >> id,
-      type_annotation,
-      tok(@lex.ASSIGN) >> ref(expr_ref),
     ) +
     lift3_maybe(
       fn(ids : Array[String], ty : T?, rhs) -> ((S) -> S)? {
@@ -193,9 +187,15 @@ fn parser() -> PS {
       type_annotation,
       tok(@lex.ASSIGN) >> ref(expr_ref),
     )
+  let common_head = lift3(
+    fn(id, ty, body) { fn(rest) { S::Let((id, fix_type(ty)), body, rest) } },
+    tok(@lex.LET) >> id,
+    type_annotation,
+    tok(@lex.ASSIGN) >> ref(expr_ref),
+  )
   stmt_ref.val = fold_right(
     ref(expr_ref),
-    stmt_head + nontop_head,
+    common_head + nontop_head,
     tok(@lex.SEMICOL).map(fn { _ => fn(u, v) { u(v) } }),
   )
   let top_head = lift2(
@@ -219,7 +219,7 @@ fn parser() -> PS {
   fold_right(
     tok(@lex.EOF).map(fn { _ => S::Unit }),
     // NOTE: top level definitions must start at the beginning of line
-    line_start >> (top_head + stmt_head),
+    line_start >> (top_head + common_head),
     tok(@lex.SEMICOL).map(fn { _ => fn(u, v) { u(v) } }),
   )
 }
