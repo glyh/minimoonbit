@@ -32,7 +32,8 @@ pub fn parse_program(intput : String) -> S {
   }
   let parsed = match parser().parse(lex_stream[:]) {
     (Some(parsed), []) => parsed
-    _ => @util.die("parse error")
+    _ => Unit
+    //@util.die("Parser Error")
   }
   ensure_top_level_type_sig(parsed)
   parsed

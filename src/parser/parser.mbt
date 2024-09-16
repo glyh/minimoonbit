@@ -227,9 +227,7 @@ fn parser() -> PS {
   stmt_ref.val = fold_right(
     ref(expr_ref),
     stmt_head,
-    tok(@lex.SEMICOL).replace(fn(u, v) { u(v) }) +
-    // HACK: Allow omitting semicolon between statements
-    epsilon().replace(fn(u, v) { u(v) }),
+    tok(@lex.SEMICOL).replace(fn(u, v) { u(v) }),
   )
   let top_head = lift2(
       fn(id : String, body : S) {
@@ -252,8 +250,6 @@ fn parser() -> PS {
     tok(@lex.EOF).replace(S::Unit),
     // NOTE: top level definitions must start at the beginning of line
     line_start >> top_head,
-    tok(@lex.SEMICOL).replace(fn(u, v) { u(v) }) +
-    // HACK: Allow omitting semicolon at top level
-    epsilon().replace(fn(u, v) { u(v) }),
+    tok(@lex.SEMICOL).replace(fn(u, v) { u(v) }),
   )
 }
