@@ -1,15 +1,9 @@
-enum GetApplyPostFix {
-  Index(S)
-  Apply(Array[S])
-}
-
-fn merge_postfix(inner : S, outers : Array[GetApplyPostFix]) -> S {
-  loop (inner, outers[:]) {
-    (acc, []) => break acc
-    (acc, [Index(accessor), .. as rest]) =>
-      continue (S::Get(acc, accessor), rest)
-    (acc, [Apply(params), .. as rest]) => continue (S::App(acc, params), rest)
-  }
+fn tier_left(op : Parser[B], next : Parser[S]) -> Parser[S] {
+  fold_left(
+    next,
+    next,
+    op.map(fn(op) { fn(lhs, rhs) { S::Prim(lhs, rhs, op, kind=None) } }),
+  )
 }
 
 fn fix_type(ty : T?) -> T {
@@ -26,10 +20,10 @@ fn parser() -> PS {
 
   // Type
   let type_ref : Ref[PT] = { val: empty() }
-  type_ref.val = tok(@lex.UNIT_T).map(fn { _ => T::Unit }) +
-    tok(@lex.BOOL_T).map(fn { _ => T::Bool }) +
-    tok(@lex.INT_T).map(fn { _ => T::Int }) +
-    tok(@lex.DOUBLE_T).map(fn { _ => T::Double }) +
+  type_ref.val = tok(@lex.UNIT_T).replace(T::Unit) +
+    tok(@lex.BOOL_T).replace(T::Bool) +
+    tok(@lex.INT_T).replace(T::Int) +
+    tok(@lex.DOUBLE_T).replace(T::Double) +
     (
       tok(@lex.ARRAY) >>
       tok(@lex.LBKT) >>
@@ -94,20 +88,22 @@ fn parser() -> PS {
     )
 
   // Get or apply
-  let get_or_apply_postfix : Parser[GetApplyPostFix] = (
+  let get_or_apply_postfix : Parser[(S) -> S] = (
       tok(@lex.LBKT) >>
-      ref(expr_ref).map(GetApplyPostFix::Index) <<
+      ref(expr_ref).map(fn { accessor => fn { arr => S::Get(arr, accessor) } }) <<
       tok(@lex.RBKT)
     ) +
     (
       tok(@lex.LPAREN) >>
-      sep_list(tok(@lex.COMMA), ref(expr_ref)).map(GetApplyPostFix::Apply) <<
+      sep_list(tok(@lex.COMMA), ref(expr_ref)).map(
+        fn { params => fn { f => S::App(f, params) } },
+      ) <<
       tok(@lex.RPAREN)
     )
-  let get_or_apply : PS = lift2(
-    merge_postfix,
+  let get_or_apply : PS = fold_left(
     ref(value_ref),
-    many(get_or_apply_postfix),
+    get_or_apply_postfix,
+    epsilon().replace(fn(u, v) { v(u) }),
   )
 
   // If
@@ -116,24 +112,20 @@ fn parser() -> PS {
       fn(_test, _then, _else) { S::If(_test, _then, _else) },
       tok(@lex.IF) >> ref(expr_ref),
       block_expr,
-      (tok(@lex.ELSE) >> block_expr) + epsilon().map(fn { _ => S::Unit }),
+      (tok(@lex.ELSE) >> block_expr) + epsilon().replace(S::Unit),
     )
 
   // Mul
-  let mul_op = tok(@lex.MUL).map(fn { _ => B::Mul }) +
-    tok(@lex.DIV).map(fn { _ => B::Div })
+  let mul_op = tok(@lex.MUL).replace(B::Mul) + tok(@lex.DIV).replace(B::Div)
   let mul_ : PS = tier_left(mul_op, if_)
 
   // Add
-  let add_op = tok(@lex.ADD).map(fn { _ => B::Add }) +
-    tok(@lex.SUB).map(fn { _ => B::Sub })
+  let add_op = tok(@lex.ADD).replace(B::Add) + tok(@lex.SUB).replace(B::Sub)
   let add_ : PS = tier_left(add_op, mul_)
 
   // Cmp
-  let cmp_op = tok(@lex.LE).map(
-      fn { _ => fn(lhs : S, rhs : S) { S::LE(lhs, rhs) } },
-    ) +
-    tok(@lex.EQ).map(fn { _ => fn(lhs : S, rhs : S) { S::Eq(lhs, rhs) } })
+  let cmp_op = tok(@lex.LE).replace(fn(lhs : S, rhs : S) { S::LE(lhs, rhs) }) +
+    tok(@lex.EQ).replace(fn(lhs : S, rhs : S) { S::Eq(lhs, rhs) })
   let cmp_ : PS = lift3(fn(lhs, op, rhs) { op(lhs, rhs) }, add_, cmp_op, add_) +
     add_
   expr_ref.val = cmp_
@@ -226,7 +218,7 @@ fn parser() -> PS {
   stmt_ref.val = fold_right(
     ref(expr_ref),
     stmt_head,
-    tok(@lex.SEMICOL).map(fn { _ => fn(u, v) { u(v) } }),
+    tok(@lex.SEMICOL).replace(fn(u, v) { u(v) }),
   )
   let top_head = lift2(
       fn(id : String, body : S) {
@@ -244,9 +236,9 @@ fn parser() -> PS {
     ) +
     let_head(true)
   fold_right(
-    tok(@lex.EOF).map(fn { _ => S::Unit }),
+    tok(@lex.EOF).replace(S::Unit),
     // NOTE: top level definitions must start at the beginning of line
     line_start >> top_head,
-    tok(@lex.SEMICOL).map(fn { _ => fn(u, v) { u(v) } }),
+    tok(@lex.SEMICOL).replace(fn(u, v) { u(v) }),
   )
 }

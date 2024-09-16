@@ -324,23 +324,6 @@ fn sep_list[U, V](sep : Parser[U], inner : Parser[V]) -> Parser[Array[V]] {
   )
 }
 
-fn tier_left(op : Parser[B], next : Parser[S]) -> Parser[S] {
-  let postfix = lift2(fn(op, next) { (op, next) }, op, next)
-  lift2(
-    fn(hd, rest : Array[(B, S)]) {
-      rest.fold(
-        init=hd,
-        fn(acc, ele) {
-          let (op, rhs) = ele
-          S::Prim(acc, rhs, op, kind=None)
-        },
-      )
-    },
-    next,
-    many(postfix),
-  )
-}
-
 fn fold_right[U, V](
   init : Parser[V],
   ele : Parser[U],
@@ -359,5 +342,37 @@ fn fold_right[U, V](
     },
     many(prefix),
     init,
+  )
+}
+
+fn replace[U, V](self : Parser[U], v : V) -> Parser[V] {
+  Parser(
+    fn(input) {
+      match self.parse(input) {
+        (None, _) => (None, input)
+        (Some(_), rest) => (Some(v), rest)
+      }
+    },
+  )
+}
+
+fn fold_left[U, V](
+  init : Parser[U],
+  ele : Parser[V],
+  op : Parser[(U, V) -> U]
+) -> Parser[U] {
+  let postfix = lift2(fn(op, ele) { (op, ele) }, op, ele)
+  lift2(
+    fn(first : U, rest : Array[((U, V) -> U, V)]) {
+      rest.fold(
+        init=first,
+        fn(acc, prefix) {
+          let (op, rhs) = prefix
+          op(acc, rhs)
+        },
+      )
+    },
+    init,
+    many(postfix),
   )
 }
