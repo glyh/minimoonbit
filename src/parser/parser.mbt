@@ -26,7 +26,8 @@ fn parser() -> PS {
 
   // Type
   let type_ref : Ref[PT] = { val: empty() }
-  type_ref.val = tok(@lex.BOOL_T).map(fn { _ => T::Bool }) +
+  type_ref.val = tok(@lex.UNIT_T).map(fn { _ => T::Unit }) +
+    tok(@lex.BOOL_T).map(fn { _ => T::Bool }) +
     tok(@lex.INT_T).map(fn { _ => T::Int }) +
     tok(@lex.DOUBLE_T).map(fn { _ => T::Double }) +
     (
@@ -37,10 +38,11 @@ fn parser() -> PS {
     ) +
     lift2(
       fn(args, ret) { T::Fun(args, ret) },
-      tok(@lex.LPAREN) >> sep_list(tok(@lex.COMMA), ref(type_ref)),
-      tok(@lex.RPAREN) >> tok(@lex.ARROW) >> ref(type_ref),
+      tok(@lex.LPAREN) >>
+      sep_list(tok(@lex.COMMA), ref(type_ref)) <<
+      tok(@lex.RPAREN),
+      tok(@lex.ARROW) >> ref(type_ref),
     ) +
-    tok(@lex.UNIT_T).map(fn { _ => T::Unit }) +
     (
       tok(@lex.LPAREN) >>
       sep_list1(tok(@lex.COMMA), ref(type_ref)).map(
@@ -55,20 +57,19 @@ fn parser() -> PS {
   // Value
   let value_ref : Ref[PS] = { val: empty() }
   value_ref.val = (
-      tok(@lex.LPAREN) >> tok(@lex.RPAREN).map(fn { _ => S::Unit })
-    ) +
-    (
       tok(@lex.LPAREN) >>
-      sep_list1(tok(@lex.COMMA), ref(expr_ref)).map(
+      sep_list(tok(@lex.COMMA), ref(expr_ref)).map(
         fn {
+          [] => S::Unit
           [x] => x
           tuple => S::Tuple(tuple)
         },
       ) <<
       tok(@lex.RPAREN)
     ) +
-    block_expr +
     bool.map(S::Bool) +
+    id.map(S::Var) +
+    block_expr +
     (tok(@lex.SUB) >> ref(value_ref).map(fn { x => S::Neg(x, kind=None) })) +
     double.map(S::Double) +
     int.map(S::Int) +
@@ -90,8 +91,7 @@ fn parser() -> PS {
         tok(@lex.COMMA) >> ref(expr_ref),
       ) <<
       tok(@lex.RPAREN)
-    ) +
-    id.map(S::Var)
+    )
 
   // Get or apply
   let get_or_apply_postfix : Parser[GetApplyPostFix] = (
@@ -143,7 +143,7 @@ fn parser() -> PS {
   let type_result = tok(@lex.ARROW) >> ref(type_ref)
   fn let_head(force_annotation : Bool) -> Parser[(S) -> S] {
     lift3(
-      fn(id, ty, body) { fn(rest) { S::Let((id, fix_type(ty)), body, rest) } },
+      fn(id, ty, rhs) { fn(rest) { S::Let((id, fix_type(ty)), rhs, rest) } },
       tok(@lex.LET) >> id,
       if force_annotation {
         type_annotation.map(Option::Some)
@@ -156,7 +156,7 @@ fn parser() -> PS {
 
   fn fn_head(
     force_annotation : Bool,
-    filt : (String) -> Bool
+    id_filter : (String) -> Bool
   ) -> Parser[(S) -> S] {
     let param = lift2(
       fn(id : String, ty : T?) { (id, fix_type(ty)) },
@@ -173,7 +173,7 @@ fn parser() -> PS {
           S::LetRec({ name: (id, fix_type(ret_ty)), args, body }, rest)
         }
       },
-      tok(@lex.FN) >> id_p(filt),
+      tok(@lex.FN) >> id_p(id_filter),
       tok(@lex.LPAREN) >> sep_list(tok(@lex.COMMA), param) << tok(@lex.RPAREN),
       if force_annotation {
         type_result.map(Option::Some)
@@ -184,7 +184,7 @@ fn parser() -> PS {
     )
   }
 
-  let nontop_head = fn_head(false, fn { _ => true }) +
+  let stmt_head = fn_head(false, fn { _ => true }) +
     let_head(false) +
     lift3_maybe(
       fn(ids : Array[String], ty : T?, rhs) -> ((S) -> S)? {
@@ -225,7 +225,7 @@ fn parser() -> PS {
   //)
   stmt_ref.val = fold_right(
     ref(expr_ref),
-    nontop_head,
+    stmt_head,
     tok(@lex.SEMICOL).map(fn { _ => fn(u, v) { u(v) } }),
   )
   let top_head = lift2(
