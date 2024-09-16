@@ -243,9 +243,9 @@ fn parser() -> PS {
         _ => true
       },
     ) +
-    let_head(true)
-  // HACK: relax to accept tuple let at top level
-  //+ let_tup_head(true)
+    let_head(true) +
+    // HACK: relax to accept tuple let at top level
+    let_tup_head(true)
   fold_right(
     tok(@lex.EOF).replace(S::Unit),
     // NOTE: top level definitions must start at the beginning of line
