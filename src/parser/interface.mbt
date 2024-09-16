@@ -13,12 +13,6 @@ fn ensure_top_level_type_sig(program : S) -> Unit {
       }
       continue inner
     }
-    LetTuple(tup, _, inner) => {
-      if not(tup.map(fn { (_, ty) => ty }).iter().all(is_concrete)) {
-        @util.die("Need outer level type annotation for \{program}")
-      }
-      continue inner
-    }
     LetRec({ name, args, .. }, inner) => {
       if not(args.map(fn { (_, ty) => ty }).iter().all(is_concrete)) ||
         not(is_concrete(name.1)) {
