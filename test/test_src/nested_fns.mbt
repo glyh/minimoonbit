@@ -9,7 +9,11 @@ fn no_ann() -> Unit {
     }; 
     fn c(x: Bool, y, z: Bool) {
       ()
-    }; fn g() { () };
+    }; let _ = {
+      fn w(a: Int) -> Int { 222 };
+      let wow = w({fn aaa(b: Bool, c: (Bool) -> Bool) {c(b)}; 2}); 
+      666 * {fn g(){ (999) }; g()}
+    };
     fn d(
       x: Bool,
       y: (Int, 
