@@ -51,7 +51,7 @@ fn id_p(p : (String) -> Bool) -> Parser[String] {
       } else {
         (None, view)
       }
-    _ as view => (None, view)
+    view => (None, view)
   }
 }
 
@@ -206,7 +206,7 @@ fn op_shr[U, V](self : Parser[U], rhs : Parser[V]) -> Parser[V] {
   Parser(
     fn(input) {
       match self.parse(input) {
-        (None, rest) => (None, rest)
+        (None, _) => (None, input)
         (Some(_), rest) => rhs.parse(rest)
       }
     },
@@ -366,8 +366,8 @@ fn fold_left[U, V](
     fn(first : U, rest : Array[((U, V) -> U, V)]) {
       rest.fold(
         init=first,
-        fn(acc, prefix) {
-          let (op, rhs) = prefix
+        fn(acc, postfix) {
+          let (op, rhs) = postfix
           op(acc, rhs)
         },
       )
