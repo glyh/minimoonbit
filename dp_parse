@@ -1,6 +1,21 @@
 #!/usr/bin/env bash
 
-for input in ./test/test_src/*.mbt; 
-do
-  moon run src/bin/main.mbt -- --end-stage parse $input
-done
+if [ -z "$1" ]; then
+  for input in ./test/test_src/*.mbt; 
+  do
+    echo "Testing case $input..."
+    moon run --no-render src/bin/main.mbt -- --end-stage parse $input 2>&1 1> /dev/null | grep RuntimeError -A 5
+  done
+  true
+else
+  echo "Testing case $1..."
+  moon run --no-render src/bin/main.mbt -- --end-stage parse ./test/test_src/$1.mbt 2>&1 1> /dev/null | grep RuntimeError -A 5
+  if [ ${PIPESTATUS[1]} -ne 0 ]; then
+    echo "No errors found."
+    true
+  else
+    echo "Found errors."
+    false
+  fi
+fi
+
