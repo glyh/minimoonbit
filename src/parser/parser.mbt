@@ -201,10 +201,11 @@ fn parser() -> PS {
     ) +
     lift2_maybe(
       fn(get_expr, rhs) {
-        match get_expr {
-          S::Get(_, _) => ()
-          _ => return None
-        }
+        // HACK: relaxed, not the syntax we're given
+        //match get_expr {
+        //  S::Get(_, _) => ()
+        //  _ => return None
+        //}
         Some(fn(rest) { S::Put(get_expr, rhs, rest) })
       },
       get_or_apply,
