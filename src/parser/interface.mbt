@@ -1,79 +1,45 @@
-fn id_to_ast!(cst : ID) -> String {
-
-}
-
-fn ty_to_ast!(cst : Type) -> @types.Type {
-
-}
-
-fn exp_to_ast!(cst : Exp) -> @types.Syntax {
-
-}
-
-fn stmt_to_ast!(cst : Stmt) -> @types.Syntax {
-
-}
-
-fn args_to_ast!(
-  cst : Result[Array[(ID, Type)], ParseError]
-) -> Array[(String, @types.Type)] {
-
-}
-
-fn cst_to_ast!(cst : Program) -> @types.Syntax {
-  let mut out : @types.Syntax = Unit
-  for topi in cst._.rev().iter() {
-    match topi._ {
-      Err(e) => raise e
-      Ok((LetDecl(id, ty, exp), _)) => {
-        let id = id_to_ast!(id)
-        let _ty = ty_to_ast!(ty)
-        let rhs = exp_to_ast!(exp)
-        out = Let((id, _ty), rhs, out)
-      }
-      Ok((FnDecl(id, args, ret_ty, body), _)) => {
-        let name = id_to_ast!(id)
-        let args = args_to_ast!(args)
-        let ret_ty = ty_to_ast!(ret_ty)
-        let body = stmt_to_ast!(body)
-        out = LetRec({ name: (name, ret_ty), args, body }, out)
-      }
-      Ok((MainDecl(body), _)) => {
-        let name = "main"
-        let args = []
-        let ret_ty = @types.Type::Unit
-        let body = stmt_to_ast!(body)
-        out = LetRec({ name: (name, ret_ty), args, body }, out)
-      }
-      Ok((InitDecl(body), _)) => {
-        let name = "init"
-        let args = []
-        let ret_ty = @types.Type::Unit
-        let body = stmt_to_ast!(body)
-        out = LetRec({ name: (name, ret_ty), args, body }, out)
-      }
-    }
+fn is_concrete(t : T) -> Bool {
+  match t {
+    Var(_) => false
+    _ => true
   }
-  out
 }
 
-pub fn parse_string(s : string) -> @types.Syntax? {
-  let tokens = try {
-    @lex.lex_string!(s)
+fn ensure_top_level_type_sig(program : S) -> Unit {
+  loop program {
+    Let((_, ty), _, inner) => {
+      if not(is_concrete(ty)) {
+        @util.die("Need outer level type annotation for \{program}")
+      }
+      continue inner
+    }
+    LetTuple(tup, _, inner) => {
+      if not(tup.map(fn { (_, ty) => ty }).iter().all(is_concrete)) {
+        @util.die("Need outer level type annotation for \{program}")
+      }
+      continue inner
+    }
+    LetRec({ name, args, .. }, inner) => {
+      if not(args.map(fn { (_, ty) => ty }).iter().all(is_concrete)) ||
+        not(is_concrete(name.1)) {
+        @util.die("Need outer level type annotation for \{program}")
+      }
+      continue inner
+    }
+    _ => break
+  }
+}
+
+pub fn parse_program(intput : String) -> S {
+  let lex_stream = try {
+    @lex.lex_string!(intput)
   } catch {
-    LexError(e) => {
-      println("!Lex: \{e}.")
-      return None
-    }
+    LexError(e) => @util.die("Lexer Error: \{e}")
   }
-  let program_parsed = program(tokens[:])
-  for e in recoverable_errors.iter() {
-    println("!Parse: \{e}.")
+  let parsed = match parser().parse(lex_stream[:]) {
+    (Some(parsed), []) => parsed
+    _ => @util.die("parse error")
   }
-
-  //try {
-  //
-  //
-  //}
-  //program()
+  ensure_top_level_type_sig(parsed)
+  parsed
 }

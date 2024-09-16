@@ -1,72 +1,5 @@
 // An O(N) lexer
 // TODO: check int, float out of bound parsing
-pub struct Loc {
-  row : Int
-  col : Int
-  index : Int
-} derive(Show)
-
-pub enum LexError_ {
-  ExpectLE
-  UnexpectedChar(Char)
-} derive(Show)
-
-pub type! LexError LexError_
-
-pub fn new_loc() -> Loc {
-  { row: 1, col: 1, index: 0 }
-}
-
-fn advance(self : Loc, c : Char) -> Loc {
-  if c == '\n' {
-    self.advance_line()
-  } else {
-    { ..self, col: self.col + 1, index: self.index + 1 }
-  }
-}
-
-fn advance_line(self : Loc) -> Loc {
-  { row: self.row + 1, col: 1, index: self.index + 1 }
-}
-
-pub enum Token {
-  ID(String)
-  COLON
-  ASSIGN
-  SEMICOL
-  FN
-  MAIN
-  INIT
-  LPAREN
-  RPAREN
-  ARROW
-  COMMA
-  LBRACE
-  RBRACE
-  EQ
-  LE
-  ADD
-  SUB
-  MUL
-  DIV
-  IF
-  ELSE
-  LBKT
-  RBKT
-  BOOL(Bool)
-  DOT
-  ARRAY
-  MAKE
-  UNIT_T
-  BOOL_T
-  DOUBLE_T
-  I32(Int)
-  F64(Double)
-  NOT
-  INT_T
-  LET
-} derive(Show, Eq)
-
 let reserved_keywords : @immut/hashmap.T[String, Token] = @immut/hashmap.of(
   [
     ("true", BOOL(true)),
@@ -77,13 +10,10 @@ let reserved_keywords : @immut/hashmap.T[String, Token] = @immut/hashmap.of(
     ("Double", DOUBLE_T),
     ("Array", ARRAY),
     ("not", NOT),
-    ("make", MAKE),
     ("if", IF),
     ("else", ELSE),
     ("fn", FN),
     ("let", LET),
-    ("main", MAIN),
-    ("init", INIT),
   ],
 )
 
@@ -117,8 +47,8 @@ enum LexState { // DFA State
   AfterFloatingDot
 }
 
-pub fn lex_string(input : String) -> Array[(Token, Loc, Loc)]!LexError {
-  let result : Array[(Token, Loc, Loc)] = Array::new()
+pub fn lex_string(input : String) -> Array[Lexeme]!LexError {
+  let result : Array[Lexeme] = Array::new()
   // put a new line here manually so we always spit the last token
   let chars = (input + "\n").iter().collect()
   let index_ub = chars.length()
@@ -165,7 +95,7 @@ pub fn lex_string(input : String) -> Array[(Token, Loc, Loc)]!LexError {
         } else {
           match symbols.find(char) {
             Some(tok) => result.push((tok, loc, loc))
-            None => raise LexError(UnexpectedChar(char))
+            None => raise LexError(UnexpectedChar(char, loc))
           }
         }
       }
@@ -237,7 +167,7 @@ pub fn lex_string(input : String) -> Array[(Token, Loc, Loc)]!LexError {
         mode = Default
         result.push((LE, last_loc, loc))
       }
-      (AfterLess, _) => raise LexError(ExpectLE)
+      (AfterLess, c) => raise LexError(UnexpectedChar(c, loc))
       (AfterMinus, '>') => {
         mode = Default
         result.push((ARROW, last_loc, loc))
@@ -250,13 +180,8 @@ pub fn lex_string(input : String) -> Array[(Token, Loc, Loc)]!LexError {
     }
     loc = loc.advance(char)
   }
+  result.push((EOF, loc, loc))
   result
-}
-
-fn fst[U, V, W](pair : (U, V, W)) -> U {
-  match pair {
-    (a, _, _) => a
-  }
 }
 
 test "simple lexing" {
@@ -275,9 +200,9 @@ test "simple lexing" {
       #| 1.0007 9.
       #| 2147483647
       ,
-    ).map(fst),
+    ).map(fn { _1 => _1.0 }),
     content=
-      #|[FN, ID("make_adder"), LPAREN, ID("x"), COLON, INT_T, RPAREN, ARROW, LPAREN, INT_T, RPAREN, ARROW, INT_T, LBRACE, FN, ID("adder"), LPAREN, ID("y"), COLON, INT_T, RPAREN, ARROW, INT_T, LBRACE, ID("x"), ADD, ID("y"), RBRACE, SEMICOL, ID("adder"), RBRACE, SEMICOL, FN, MAIN, LBRACE, ID("print_int"), LPAREN, LPAREN, ID("make_adder"), LPAREN, I32(3), RPAREN, RPAREN, LPAREN, I32(7), RPAREN, RPAREN, RBRACE, SEMICOL, F64(1.0007), F64(9), I32(2147483647)]
+      #|[FN, ID("make_adder"), LPAREN, ID("x"), COLON, INT_T, RPAREN, ARROW, LPAREN, INT_T, RPAREN, ARROW, INT_T, LBRACE, FN, ID("adder"), LPAREN, ID("y"), COLON, INT_T, RPAREN, ARROW, INT_T, LBRACE, ID("x"), ADD, ID("y"), RBRACE, SEMICOL, ID("adder"), RBRACE, SEMICOL, FN, ID("main"), LBRACE, ID("print_int"), LPAREN, LPAREN, ID("make_adder"), LPAREN, I32(3), RPAREN, RPAREN, LPAREN, I32(7), RPAREN, RPAREN, RBRACE, SEMICOL, F64(1.0007), F64(9), I32(2147483647), EOF]
     ,
   )
 }
