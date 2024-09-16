@@ -27,37 +27,37 @@ fn advance_line(self : Loc) -> Loc {
 }
 
 pub enum Token {
-  ID(String)
-  COLON
-  ASSIGN
-  SEMICOL
+  BOOL(Bool)
+  UNIT_T
+  BOOL_T
+  INT_T
+  DOUBLE_T
+  ARRAY
+  NOT
+  IF
+  ELSE
   FN
-  LPAREN
-  RPAREN
-  ARROW
-  COMMA
-  LBRACE
-  RBRACE
-  EQ
-  LE
+  LET
+  I32(Int)
+  F64(Double)
+  ID(String)
   ADD
   SUB
   MUL
   DIV
-  IF
-  ELSE
+  ASSIGN
+  EQ
+  LE
+  LPAREN
+  RPAREN
   LBKT
   RBKT
-  BOOL(Bool)
-  ARRAY
-  UNIT_T
-  BOOL_T
-  DOUBLE_T
-  I32(Int)
-  F64(Double)
-  NOT
-  INT_T
-  LET
+  LBRACE
+  RBRACE
+  ARROW
+  COLON
+  SEMICOL
+  COMMA
   EOF
 } derive(Show, Eq)
 
