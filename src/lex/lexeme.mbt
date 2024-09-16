@@ -16,14 +16,10 @@ fn new_loc() -> Loc {
 
 fn advance(self : Loc, c : Char) -> Loc {
   if c == '\n' {
-    self.advance_line()
+    { row: self.row + 1, col: 1, index: self.index + 1 }
   } else {
     { ..self, col: self.col + 1, index: self.index + 1 }
   }
-}
-
-fn advance_line(self : Loc) -> Loc {
-  { row: self.row + 1, col: 1, index: self.index + 1 }
 }
 
 pub enum Token {
