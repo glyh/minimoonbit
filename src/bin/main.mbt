@@ -225,7 +225,7 @@ fn main {
             let i = @strconv.parse_int?(s)
             match i {
               Ok(i) => knf_opt_iters.val = i
-              Err(e) => @util.die("Invalid number")
+              Err(_) => @util.die("Invalid number")
             }
           },
         ),
@@ -239,7 +239,7 @@ fn main {
             let i = @strconv.parse_int?(s)
             match i {
               Ok(i) => knf_opt_inline_threshold.val = i
-              Err(e) => @util.die("Invalid number")
+              Err(_) => @util.die("Invalid number")
             }
           },
         ),
