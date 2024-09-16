@@ -49,7 +49,6 @@ pub enum Token {
   LBKT
   RBKT
   BOOL(Bool)
-  DOT
   ARRAY
   UNIT_T
   BOOL_T

@@ -19,7 +19,6 @@ let reserved_keywords : @immut/hashmap.T[String, Token] = @immut/hashmap.of(
 
 let symbols : @immut/hashmap.T[Char, Token] = @immut/hashmap.of(
   [
-    ('.', DOT),
     ('+', ADD),
     ('*', MUL),
     ('/', DIV),
