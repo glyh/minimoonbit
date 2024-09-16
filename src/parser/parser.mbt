@@ -133,6 +133,34 @@ fn parser() -> PS {
   // Statement
   let type_annotation = tok(@lex.COLON) >> ref(type_ref)
   let type_result = tok(@lex.ARROW) >> ref(type_ref)
+  fn let_tup_head(force_annotation : Bool) -> Parser[(S) -> S] {
+    lift3_maybe(
+      fn(ids : Array[String], ty : T?, rhs) -> ((S) -> S)? {
+        let ids_typed = match ty {
+          Some(T::Tuple(tys)) =>
+            if tys.length() != ids.length() {
+              return None
+            } else {
+              ids.mapi(fn(i, name) { (name, tys[i]) })
+            }
+          Some(_) => return None
+          None => ids.map(fn { name => (name, T::Var({ val: None })) })
+        }
+        Some(fn(rest) { S::LetTuple(ids_typed, rhs, rest) })
+      },
+      tok(@lex.LET) >>
+      tok(@lex.LPAREN) >>
+      sep_list1(tok(@lex.COMMA), id) <<
+      tok(@lex.RPAREN),
+      if force_annotation {
+        type_annotation.map(Option::Some)
+      } else {
+        maybe(type_annotation)
+      },
+      tok(@lex.ASSIGN) >> ref(expr_ref),
+    )
+  }
+
   fn let_head(force_annotation : Bool) -> Parser[(S) -> S] {
     lift3(
       fn(id, ty, rhs) { fn(rest) { S::Let((id, fix_type(ty)), rhs, rest) } },
@@ -178,40 +206,20 @@ fn parser() -> PS {
 
   let stmt_head = fn_head(false, fn { _ => true }) +
     let_head(false) +
-    lift3_maybe(
-      fn(ids : Array[String], ty : T?, rhs) -> ((S) -> S)? {
-        let ids_typed = match ty {
-          Some(T::Tuple(tys)) =>
-            if tys.length() != ids.length() {
-              return None
-            } else {
-              ids.mapi(fn(i, name) { (name, tys[i]) })
-            }
-          Some(_) => return None
-          None => ids.map(fn { name => (name, T::Var({ val: None })) })
-        }
-        Some(fn(rest) { S::LetTuple(ids_typed, rhs, rest) })
-      },
-      tok(@lex.LET) >>
-      tok(@lex.LPAREN) >>
-      sep_list1(tok(@lex.COMMA), id) <<
-      tok(@lex.RPAREN),
-      maybe(type_annotation),
-      tok(@lex.ASSIGN) >> ref(expr_ref),
-    ) +
+    let_tup_head(false) +
     lift2_maybe(
       fn(get_expr, rhs) {
-        // HACK: relaxed, not the syntax we're given
-        //match get_expr {
-        //  S::Get(_, _) => ()
-        //  _ => return None
-        //}
+        // HACK: comment below to relax enforcement 
+        match get_expr {
+          S::Get(_, _) => ()
+          _ => return None
+        }
         Some(fn(rest) { S::Put(get_expr, rhs, rest) })
       },
       get_or_apply,
       tok(@lex.ASSIGN) >> ref(expr_ref),
     )
-  // To support sequencing exps:
+  // HACK: To support sequencing exps:
   //+
   //ref(expr_ref).map(
   //  fn { exp => fn(rest) { S::Let(("_", fix_type(None)), exp, rest) } },
@@ -236,6 +244,8 @@ fn parser() -> PS {
       },
     ) +
     let_head(true)
+  // HACK: relax to accept tuple let at top level
+  //+ let_tup_head(true)
   fold_right(
     tok(@lex.EOF).replace(S::Unit),
     // NOTE: top level definitions must start at the beginning of line
