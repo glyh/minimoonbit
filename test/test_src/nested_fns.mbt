@@ -2,6 +2,8 @@ fn no_ann() -> Unit {
   fn main() { fn lol(){ {fn wat(){()}; 1} }; 3 };
   fn a(u: Int, v: Int, w) -> Int {
     fn init() { () };
+    fn wow(u, v, w, x, y, z) { 
+      fn wow2(r, g, b, c, y, m, k) { k }; 1 };
     fn b(x: Bool, y, z: Bool) {
       ()
     }; 
