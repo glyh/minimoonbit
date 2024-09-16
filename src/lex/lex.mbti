@@ -1,12 +1,17 @@
 package moonbitlang/minimbt/lex
 
 // Values
-fn lex_string(String) -> Array[(Token, Loc, Loc)]!
-
-fn new_loc() -> Loc
+fn lex_string(String) -> Array[(Token, Loc, Loc)]!LexError
 
 // Types and methods
-pub type! ExpectLE
+pub type! LexError LexError_
+
+pub enum LexError_ {
+  UnexpectedChar(Char, Loc)
+}
+impl LexError_ {
+  to_string(Self) -> String
+}
 
 type LexState
 
@@ -24,11 +29,7 @@ pub enum Token {
   COLON
   ASSIGN
   SEMICOL
-  FN0
-  LET0
   FN
-  MAIN
-  INIT
   LPAREN
   RPAREN
   ARROW
@@ -48,7 +49,6 @@ pub enum Token {
   BOOL(Bool)
   DOT
   ARRAY
-  MAKE
   UNIT_T
   BOOL_T
   DOUBLE_T
@@ -57,19 +57,20 @@ pub enum Token {
   NOT
   INT_T
   LET
+  EOF
 }
 impl Token {
   op_equal(Self, Self) -> Bool
   to_string(Self) -> String
 }
 
-pub type! UnexpectedChar Char
-
 // Type aliases
 
 // Traits
 
 // Extension Methods
+impl Show for LexError_
+
 impl Show for Loc
 
 impl Show for Token

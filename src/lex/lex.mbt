@@ -9,7 +9,7 @@ let reserved_keywords : @immut/hashmap.T[String, Token] = @immut/hashmap.of(
     ("Int", INT_T),
     ("Double", DOUBLE_T),
     ("Array", ARRAY),
-    ("not", NOT),
+    ("not", NOT), // only non-keyword in moonbit here
     ("if", IF),
     ("else", ELSE),
     ("fn", FN),

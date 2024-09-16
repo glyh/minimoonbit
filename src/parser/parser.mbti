@@ -1,0 +1,18 @@
+package moonbitlang/minimbt/parser
+
+alias @moonbitlang/minimbt as @minimbt
+
+// Values
+fn parse_program(String) -> @minimbt.Syntax
+
+// Types and methods
+type GetApplyPostFix
+
+type Parser
+
+// Type aliases
+
+// Traits
+
+// Extension Methods
+
