@@ -20,3 +20,5 @@ rv64_failed_tests/
 __pycache__
 
 /rvlinux
+
+/submit.zip
