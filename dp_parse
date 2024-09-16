@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+for input in ./test/test_src/*.mbt; 
+do
+  moon run src/bin/main.mbt -- --end-stage parse $input
+done
