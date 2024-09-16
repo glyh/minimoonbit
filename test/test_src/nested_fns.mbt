@@ -8,12 +8,21 @@ fn no_ann() -> Unit {
     fn c(x: Bool, y, z: Bool) {
       ()
     }; fn g() { () };
-    fn d(x: Bool, y: Int, z: Int) -> ((Unit) -> Int) -> Int {
+    fn d(
+      x: Bool,
+      y: (Int, (Int, (Bool) -> Int) -> (Bool, Int, Int) -> Bool, (Int, Int, Bool)),
+      z: Int)
+    -> ((Unit) -> Int) -> Int {
       fn d(x: Bool, y: Int, z: Int) {
+        let _ = not(not(not(x)));
+        let _ = -----y <= y;
+        let _ = y == y;
+        let a = Array::make(10, 10);
+        a[1] = 2;
         fn d() -> Unit {
           ()
         }; ()
-      }; ();
+      }; 
       fn ret(q) {
         q()
       };
