@@ -190,14 +190,7 @@ fn parser() -> PS {
     lift4(
       fn(id : String, args : Array[(String, T)], ret_ty : T?, body : S) {
         fn(rest) {
-          S::LetRec(
-            {
-              name: (id, T::Fun(args.map(fn { _1 => _1.1 }), fix_type(ret_ty))),
-              args,
-              body,
-            },
-            rest,
-          )
+          S::LetRec({ name: (id, fix_type(ret_ty)), args, body }, rest)
         }
       },
       tok(@lex.FN) >> id_p(id_filter),
@@ -238,9 +231,7 @@ fn parser() -> PS {
   )
   let top_head = lift2(
       fn(id : String, body : S) {
-        fn(rest) {
-          S::LetRec({ name: (id, T::Fun([], T::Unit)), args: [], body }, rest)
-        }
+        fn(rest) { S::LetRec({ name: (id, T::Unit), args: [], body }, rest) }
       },
       tok(@lex.FN) >> id_p(fn(s) { s == "main" || s == "init" }),
       block_expr,
