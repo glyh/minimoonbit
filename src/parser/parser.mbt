@@ -27,6 +27,7 @@ fn parser() -> PS {
   // Type
   let type_ref : Ref[PT] = { val: empty() }
   type_ref.val = tok(@lex.UNIT_T).map(fn { _ => T::Unit }) +
+    tok(@lex.BOOL_T).map(fn { _ => T::Bool }) +
     tok(@lex.INT_T).map(fn { _ => T::Int }) +
     tok(@lex.DOUBLE_T).map(fn { _ => T::Double }) +
     (

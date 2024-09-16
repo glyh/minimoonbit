@@ -119,3 +119,20 @@ test "parse matmul.mbt" {
     ,
   )
 }
+
+test "nested fns" {
+  let src =
+    #|fn no_ann() -> Unit {
+    #|  fn a(u: Int, v: Int, w) -> Int {
+    #|    fn b(x: Bool, y, z: Bool) {
+    #|      ()
+    #|    }; ()
+    #|  }; ()
+    #|};
+  inspect!(
+    parse_program(src),
+    content=
+      #|LetRec({name: ("no_ann", Unit), args: [], body: LetRec({name: ("a", Int), args: [("u", Int), ("v", Int), ("w", Var({val: None}))], body: LetRec({name: ("b", Var({val: None})), args: [("x", Bool), ("y", Var({val: None})), ("z", Bool)], body: Unit}, Unit)}, Unit)}, Unit)
+    ,
+  )
+}
