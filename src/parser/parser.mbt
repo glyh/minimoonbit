@@ -17,6 +17,7 @@ fn parser() -> PS {
   let expr_ref : Ref[PS] = { val: empty() }
   let stmt_ref : Ref[PS] = { val: empty() }
   let block_expr = tok(@lex.LBRACE) >>
+    // HACK: there's test case that uses `{}` 
     (ref(stmt_ref) + epsilon().replace(S::Unit)) <<
     tok(@lex.RBRACE)
 
@@ -211,7 +212,6 @@ fn parser() -> PS {
     let_tup_head(false) +
     lift2_maybe(
       fn(get_expr, rhs) {
-        // HACK: comment below to relax enforcement 
         match get_expr {
           S::Get(_, _) => ()
           _ => return None
@@ -221,11 +221,6 @@ fn parser() -> PS {
       get_or_apply,
       tok(@lex.ASSIGN) >> ref(expr_ref),
     )
-  // HACK: To support sequencing exps:
-  //+
-  //ref(expr_ref).map(
-  //  fn { exp => fn(rest) { S::Let(("_", fix_type(None)), exp, rest) } },
-  //)
   stmt_ref.val = fold_right(
     ref(expr_ref),
     stmt_head,
@@ -245,9 +240,7 @@ fn parser() -> PS {
         _ => true
       },
     ) +
-    let_head(true) +
-    // HACK: relax to accept tuple let at top level
-    let_tup_head(true)
+    let_head(true)
   fold_right(
     tok(@lex.EOF).replace(S::Unit),
     // NOTE: top level definitions must start at the beginning of line
