@@ -138,34 +138,53 @@ fn parser() -> PS {
   expr_ref.val = cmp_
 
   // Statement
-  let type_annotation = maybe(tok(@lex.COLON) >> ref(type_ref))
-  let param = lift2(
-    fn(id : String, ty : T?) { (id, fix_type(ty)) },
-    id,
-    type_annotation,
-  )
-  let nontop_head = lift2_maybe(
-      fn(get_expr, rhs) {
-        match get_expr {
-          S::Get(_, _) => ()
-          _ => return None
-        }
-        Some(fn(rest) { S::Put(get_expr, rhs, rest) })
+  let type_annotation = tok(@lex.COLON) >> ref(type_ref)
+  let type_result = tok(@lex.ARROW) >> ref(type_ref)
+  fn let_head(force_annotation : Bool) -> Parser[(S) -> S] {
+    lift3(
+      fn(id, ty, body) { fn(rest) { S::Let((id, fix_type(ty)), body, rest) } },
+      tok(@lex.LET) >> id,
+      if force_annotation {
+        type_annotation.map(Option::Some)
+      } else {
+        maybe(type_annotation)
       },
-      get_or_apply,
       tok(@lex.ASSIGN) >> ref(expr_ref),
-    ) +
+    )
+  }
+
+  fn fn_head(
+    force_annotation : Bool,
+    filt : (String) -> Bool
+  ) -> Parser[(S) -> S] {
+    let param = lift2(
+      fn(id : String, ty : T?) { (id, fix_type(ty)) },
+      id,
+      if force_annotation {
+        type_annotation.map(Option::Some)
+      } else {
+        maybe(type_annotation)
+      },
+    )
     lift4(
       fn(id : String, args : Array[(String, T)], ret_ty : T?, body : S) {
         fn(rest) {
           S::LetRec({ name: (id, fix_type(ret_ty)), args, body }, rest)
         }
       },
-      tok(@lex.FN) >> id,
+      tok(@lex.FN) >> id_p(filt),
       tok(@lex.LPAREN) >> sep_list(tok(@lex.COMMA), param) << tok(@lex.RPAREN),
-      maybe(tok(@lex.ARROW) >> ref(type_ref)),
+      if force_annotation {
+        type_result.map(Option::Some)
+      } else {
+        maybe(type_result)
+      },
       block_expr,
-    ) +
+    )
+  }
+
+  let nontop_head = fn_head(false, fn { _ => true }) +
+    let_head(false) +
     lift3_maybe(
       fn(ids : Array[String], ty : T?, rhs) -> ((S) -> S)? {
         let ids_typed = match ty {
@@ -184,18 +203,23 @@ fn parser() -> PS {
       tok(@lex.LPAREN) >>
       sep_list1(tok(@lex.COMMA), id) <<
       tok(@lex.RPAREN),
-      type_annotation,
+      maybe(type_annotation),
+      tok(@lex.ASSIGN) >> ref(expr_ref),
+    ) +
+    lift2_maybe(
+      fn(get_expr, rhs) {
+        match get_expr {
+          S::Get(_, _) => ()
+          _ => return None
+        }
+        Some(fn(rest) { S::Put(get_expr, rhs, rest) })
+      },
+      get_or_apply,
       tok(@lex.ASSIGN) >> ref(expr_ref),
     )
-  let common_head = lift3(
-    fn(id, ty, body) { fn(rest) { S::Let((id, fix_type(ty)), body, rest) } },
-    tok(@lex.LET) >> id,
-    type_annotation,
-    tok(@lex.ASSIGN) >> ref(expr_ref),
-  )
   stmt_ref.val = fold_right(
     ref(expr_ref),
-    common_head + nontop_head,
+    nontop_head,
     tok(@lex.SEMICOL).map(fn { _ => fn(u, v) { u(v) } }),
   )
   let top_head = lift2(
@@ -205,21 +229,18 @@ fn parser() -> PS {
       tok(@lex.FN) >> id_p(fn(s) { s == "main" || s == "init" }),
       block_expr,
     ) +
-    lift4(
-      fn(id : String, args : Array[(String, T)], ret_ty : T?, body : S) {
-        fn(rest) {
-          S::LetRec({ name: (id, fix_type(ret_ty)), args, body }, rest)
-        }
+    fn_head(
+      true,
+      fn {
+        "main" | "init" => false
+        _ => true
       },
-      tok(@lex.FN) >> id_p(fn(s) { s != "main" && s != "init" }),
-      tok(@lex.LPAREN) >> sep_list(tok(@lex.COMMA), param) << tok(@lex.RPAREN),
-      maybe(tok(@lex.ARROW) >> ref(type_ref)),
-      block_expr,
-    )
+    ) +
+    let_head(true)
   fold_right(
     tok(@lex.EOF).map(fn { _ => S::Unit }),
     // NOTE: top level definitions must start at the beginning of line
-    line_start >> (top_head + common_head),
+    line_start >> top_head,
     tok(@lex.SEMICOL).map(fn { _ => fn(u, v) { u(v) } }),
   )
 }
