@@ -38,7 +38,7 @@ pub fn to_knf_with_tenv(kenv : KnfEnv, s : S) -> (Knf, T) {
       q.push(kenv, ele)
       let external_name = match ele.1 {
         Int => "minimbt_create_array"
-        Double => "minimbt_float_array"
+        Double => "minimbt_create_float_array"
         _ => "minimbt_create_ptr_array"
       }
       (
