@@ -22,7 +22,9 @@ fn fix_type(ty : T?) -> T {
 fn parser() -> PS {
   let expr_ref : Ref[PS] = { val: empty() }
   let stmt_ref : Ref[PS] = { val: empty() }
-  let block_expr = tok(@lex.LBRACE) >> ref(stmt_ref) << tok(@lex.RBRACE)
+  let block_expr = tok(@lex.LBRACE) >>
+    (ref(stmt_ref) + epsilon().replace(S::Unit)) <<
+    tok(@lex.RBRACE)
 
   // Type
   let type_ref : Ref[PT] = { val: empty() }
