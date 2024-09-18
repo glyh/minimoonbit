@@ -55,11 +55,11 @@ fn main {
   b[2][0] = 11.0; b[2][1] = 12.0;
   let _ = mul(2,3,2,a,b,c);
   let _ = print_int(truncate(c[0][0]));
-  let _ = print_newline();
+  let _ = print_endline();
   let _ = print_int(truncate(c[0][1]));
-  let _ = print_newline();
+  let _ = print_endline();
   let _ = print_int(truncate(c[1][0]));
-  let _ = print_newline();
+  let _ = print_endline();
   let _ = print_int(truncate(c[1][1]));
   ()
 };
