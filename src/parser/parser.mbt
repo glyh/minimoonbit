@@ -23,8 +23,9 @@ fn parser() -> PS {
   let expr_ref : Ref[PS] = { val: empty() }
   let stmt_ref : Ref[PS] = { val: empty() }
   let block_expr = tok(@lex.LBRACE) >>
+    ref(stmt_ref) <<
     // HACK: there's test case that uses `{}` 
-    (ref(stmt_ref) + epsilon().replace(S::Unit)) <<
+    //+ epsilon().replace(S::Unit)
     tok(@lex.RBRACE)
 
   // Type
