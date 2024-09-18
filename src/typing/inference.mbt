@@ -24,11 +24,12 @@ fn free_variables(t : T) -> TVarSet {
 typealias Resolved = (Ref[Result[T, TVar]], T)
 
 fn unify_one(c : Constraint) -> (Resolved?, Array[Constraint]) {
-  let (lhs, rhs) = c
+  let lhs = c.0.normalize()
+  let rhs = c.1.normalize()
   if lhs == rhs {
     return (None, [])
   }
-  match c {
+  match (lhs, rhs) {
     (Fun(args1, ret1), Fun(args2, ret2)) =>
       if args1.length() != args2.length() {
         @util.die("Args number mismatch for function unification \{c}")
@@ -71,14 +72,14 @@ fn unify(cs : Array[Constraint]) -> Unit {
           (
             Some(
               (
-                { val: Err((id1, clss1)) } as ref1,
+                { val: Err((_, clss1)) } as ref1,
                 Var({ val: Err((id2, clss2)) } as ref2),
               )
             ), // both var unknown, we just need to union their clsses
             cs_new,
           ) => {
-            ref1.val = Err((id1, clss1.union(clss2)))
             ref2.val = Err((id2, clss1.union(clss2)))
+            ref1.val = Ok(Var(ref2))
             cs.append(cs_new)
           }
           (Some(({ val: Err((_, clss)) } as ref, tj)), cs_new) => {

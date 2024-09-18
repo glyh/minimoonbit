@@ -114,3 +114,14 @@ pub fn Type::is_known(self : Type) -> Bool {
     Var({ val: Err(_) }) => false
   }
 }
+
+pub fn Type::normalize(self : Type) -> Type {
+  match self {
+    Unit | Bool | Int | Double | Ptr => self
+    Fun(args, ret) => Fun(args.map(normalize), ret.normalize())
+    Tuple(tup) => Tuple(tup.map(normalize))
+    Array(t) => Array(t.normalize())
+    Var({ val: Ok(t) }) => t.normalize()
+    Var({ val: Err(_) }) => self
+  }
+}
