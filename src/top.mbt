@@ -17,7 +17,7 @@ pub enum Syntax {
   Let((String, Type), Syntax, Syntax) // let _: _ = _; _
   LetRec(Fundef, Syntax) // fn f() {} ; _
   LetTuple(Array[(String, Type)], Syntax, Syntax) // let (_ , _) : (_, _)= _; _
-  Put(Syntax, Syntax, Syntax) // _[_] = _
+  Put(Syntax, Syntax, Syntax) // lhs = rhs; rest
 } derive(Show)
 
 pub enum Op {

@@ -224,11 +224,11 @@ fn parser() -> PS {
     let_tup_head(false) +
     lift2_maybe(
       fn(get_expr, rhs) {
-        match get_expr {
-          S::Get(_, _) => ()
+        let prefix = match get_expr {
+          S::Get(arr, idx) => S::Put(arr, idx, rhs)
           _ => return None
         }
-        Some(fn(rest) { S::Put(get_expr, rhs, rest) })
+        Some(fn(rest) { S::Let(("_", @types.dummy_tvar()), prefix, rest) })
       },
       get_or_apply,
       tok(@lex.ASSIGN) >> ref(expr_ref),

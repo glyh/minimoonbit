@@ -10,7 +10,7 @@ fn add_interpreter_fns(interpreter : @knf_eval.KnfInterpreter) -> Unit {
     },
   )
   interpreter.add_extern_fn(
-    "minimbt_print_endline",
+    "minimbt_print_newline",
     fn(_args) {
       @io.print("\n")
       Unit
@@ -104,7 +104,7 @@ fn add_closure_interpreter_fns(
     },
   )
   interpreter.add_extern_fn(
-    "minimbt_print_endline",
+    "minimbt_print_newline",
     fn(_args) {
       @io.print("\n")
       Unit

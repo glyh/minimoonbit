@@ -230,14 +230,15 @@ fn inference_constraints(env : TyEnv, s : S) -> (T, Array[Constraint]) {
       cs_out.push((rhs_ty, T::Tuple(tup.map(fn { (_1, _2) => _2 }))))
       (ret_ty, cs_out)
     }
-    Put(lhs, rhs, rest) => {
-      let (lhs_ty, cs_out) = inference_constraints(env, lhs)
-      let (rhs_ty, rhs_cons) = inference_constraints(env, rhs)
-      let (rest_ty, rest_cons) = inference_constraints(env, rest)
-      cs_out.append(rhs_cons)
-      cs_out.append(rest_cons)
-      cs_out.push((lhs_ty, rhs_ty))
-      (rest_ty, cs_out)
+    Put(arr, idx, rhs) => {
+      let (arr_ty, cs_out) = inference_constraints(env, arr)
+      let (idx_ty, idx_cs) = inference_constraints(env, idx)
+      let (rhs_ty, rhs_cs) = inference_constraints(env, rhs)
+      cs_out.append(idx_cs)
+      cs_out.append(rhs_cs)
+      cs_out.push((arr_ty, T::Array(rhs_ty)))
+      cs_out.push((idx_ty, T::Int))
+      (T::Unit, cs_out)
     }
   }
 }

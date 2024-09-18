@@ -145,14 +145,14 @@ pub fn to_knf_with_tenv(kenv : KnfEnv, s : S) -> (Knf, T) {
       let rest = to_knf_with_tenv(inner_env, rest)
       (q.refold_knf(LetTuple(tup, q.at(0), rest.0)), rest.1)
     }
-    Put(lhs, rhs, rest) => {
-      let lhs = to_knf_with_tenv(kenv, lhs)
-      q.push(kenv, lhs)
+    Put(arr, idx, rhs) => {
+      let arr = to_knf_with_tenv(kenv, arr)
+      q.push(kenv, arr)
+      let idx = to_knf_with_tenv(kenv, idx)
+      q.push(kenv, idx)
       let rhs = to_knf_with_tenv(kenv, rhs)
       q.push(kenv, rhs)
-      let rest = to_knf_with_tenv(kenv, rest)
-      q.push(kenv, rest)
-      (q.refold_knf(Put(q.at(0), q.at(1), q.at(2))), rest.1)
+      (q.refold_knf(Put(q.at(0), q.at(1), q.at(2))), Unit)
     }
   }
 }
