@@ -1,4 +1,4 @@
-// reference: https://moonbitlang.github.io/moonbit-textbook/parser/#syntax-parsing
+// REF: https://moonbitlang.github.io/moonbit-textbook/parser/#syntax-parsing
 
 typealias Lexeme = (@lex.Token, @lex.Loc, @lex.Loc)
 
