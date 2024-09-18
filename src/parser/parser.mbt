@@ -2,14 +2,18 @@ fn tier_left(op : Parser[B], next : Parser[S]) -> Parser[S] {
   fold_left(
     next,
     next,
-    op.map(fn(op) { fn(lhs, rhs) { S::Prim(lhs, rhs, op, kind=None) } }),
+    op.map(
+      fn(op) {
+        fn(lhs, rhs) { S::Prim(lhs, rhs, op, kind=@types.dummy_tvar()) }
+      },
+    ),
   )
 }
 
 fn fix_type(ty : T?) -> T {
   match ty {
     Some(ty) => ty
-    None => T::Var({ val: None })
+    None => @types.dummy_tvar()
   }
 }
 
@@ -67,7 +71,10 @@ fn parser() -> PS {
     bool.map(S::Bool) +
     id.map(S::Var) +
     block_expr +
-    (tok(@lex.SUB) >> ref(value_ref).map(fn { x => S::Neg(x, kind=None) })) +
+    (
+      tok(@lex.SUB) >>
+      ref(value_ref).map(fn { x => S::Neg(x, kind=@types.dummy_tvar()) })
+    ) +
     double.map(S::Double) +
     int.map(S::Int) +
     (
@@ -147,7 +154,7 @@ fn parser() -> PS {
               ids.mapi(fn(i, name) { (name, tys[i]) })
             }
           Some(_) => return None
-          None => ids.map(fn { name => (name, T::Var({ val: None })) })
+          None => ids.map(fn { name => (name, @types.dummy_tvar()) })
         }
         Some(fn(rest) { S::LetTuple(ids_typed, rhs, rest) })
       },

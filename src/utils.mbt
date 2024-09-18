@@ -8,8 +8,8 @@ pub fn to_json(self : Type) -> Json {
       ["Fun", params.map(Type::to_json) |> Json::Array, result.to_json()]
     Tuple(types) => ["Tuple", types.map(Type::to_json) |> Json::Array]
     Array(t) => ["Array", t.to_json()]
-    Var({ val: None }) => ["Var", "None"]
-    Var({ val: Some(t) }) => ["Var", ["Some", t.to_json()]]
+    Var({ val: Err(_) }) => ["Var", "None"]
+    Var({ val: Ok(t) }) => ["Var", ["Some", t.to_json()]]
     Ptr => "Ptr"
   }
 }
@@ -32,8 +32,8 @@ pub fn Type::from_json(self : Json) -> Type!Error {
       Fun(from!(params), result |> Type::from_json!())
     ["Tuple", [.. as types]] => Tuple(from!(types))
     ["Array", t] => Array(t |> Type::from_json!())
-    ["Var", "None"] => Var({ val: None })
-    ["Var", ["Some", t]] => Var({ val: Some(t |> Type::from_json!()) })
+    ["Var", "None"] => dummy_tvar()
+    ["Var", ["Some", t]] => Var({ val: Ok(t |> Type::from_json!()) })
     "Ptr" => Ptr
     _ => fail!("invalid json: should contain a valid type")
   }
@@ -57,13 +57,37 @@ test {
     content="Ok(Array(Int))",
   )
   inspect!(
-    Type::from_json?(Type::Var({ val: None }).to_json()),
-    content="Ok(Var({val: None}))",
+    Type::from_json?(dummy_tvar().to_json()),
+    content="Ok(Var({val: Err((2, @immut/sorted_set.of([])))}))",
   )
   inspect!(
-    Type::from_json?(Type::Var({ val: Some(Type::Int) }).to_json()),
-    content="Ok(Var({val: Some(Int)}))",
+    Type::from_json?(Type::Var({ val: Ok(Type::Int) }).to_json()),
+    content="Ok(Var({val: Ok(Int)}))",
   )
+}
+
+pub fn Type::clone(self : Type) -> Type {
+  match self {
+    Unit | Bool | Int | Double | Ptr as t => t
+    Fun(args, ret) => Fun(args.map(Type::clone), ret.clone())
+    Tuple(tup) => Tuple(tup.map(Type::clone))
+    Array(inner) => Array(inner.clone())
+    Var({ val: v }) => Var({ val: v })
+  }
+}
+
+test "Clone type works" {
+  let t1 = dummy_tvar()
+  match t1 {
+    Var(ref) => ref.val = Ok(Int)
+  }
+  let t2 = t1.clone()
+  match t2 {
+    Var(ref) => ref.val = Ok(Double)
+  }
+  match t1 {
+    Var(ref) => assert_eq!(ref.val, Ok(Int))
+  }
 }
 
 pub fn to_json(self : Fundef) -> Json {
@@ -121,6 +145,15 @@ pub fn Fundef::from_json(json : Json) -> Fundef!Error {
   }
 }
 
+pub fn Fundef::clone(self : Fundef) -> Fundef {
+  fn clone_arg(arg : (String, Type)) -> (String, Type) {
+    let (name, ty) = arg
+    (name, ty.clone())
+  }
+
+  { name: self.name, args: self.args.map(clone_arg), body: self.body.clone() }
+}
+
 pub fn to_json(self : Syntax) -> Json {
   match self {
     Unit => "Unit"
@@ -128,10 +161,22 @@ pub fn to_json(self : Syntax) -> Json {
     Int(i) => ["Int", Json::Number(i.to_double())]
     Double(f) => ["Float", Json::Number(f)]
     Not(e) => ["Not", e.to_json()]
-    Neg(e, kind=Some(Double)) => ["FNeg", e.to_json()]
-    Neg(e, kind=_) => ["Neg", e.to_json()]
+    Neg(e, ~kind) =>
+      if kind == Double {
+        ["FNeg", e.to_json()]
+      } else if kind == Int {
+        ["Neg", e.to_json()]
+      } else {
+        @util.die("Unexpected argument type \{kind} for \{self}")
+      }
     Prim(e1, e2, op, ~kind) => {
-      let op = if kind == Some(Double) { "F\{op}" } else { "{op}" }
+      let op = if kind == Double {
+        "F\{op}"
+      } else if kind == Int {
+        "{op}"
+      } else {
+        @util.die("Unexpected argument type \{kind} for \{self}")
+      }
       [op |> Json::String, e1.to_json(), e2.to_json()]
     }
     Eq(e1, e2) => ["Eq", e1.to_json(), e2.to_json()]
@@ -178,63 +223,63 @@ pub fn Syntax::from_json(json : Json) -> Syntax! {
         None => fail!("invalid json: should contain a number as float")
       }
     ["Not", e] => Not(e |> Syntax::from_json!())
-    ["Neg", e] => Neg(e |> Syntax::from_json!(), kind=None)
-    ["FNeg", e] => Neg(e |> Syntax::from_json!(), kind=Some(Double))
+    ["Neg", e] => Neg(e |> Syntax::from_json!(), kind=dummy_tvar())
+    ["FNeg", e] => Neg(e |> Syntax::from_json!(), kind=Double)
     ["Add", e1, e2] =>
       Prim(
         e1 |> Syntax::from_json!(),
         e2 |> Syntax::from_json!(),
         Add,
-        kind=None,
+        kind=dummy_tvar(),
       )
     ["Sub", e1, e2] =>
       Prim(
         e1 |> Syntax::from_json!(),
         e2 |> Syntax::from_json!(),
         Sub,
-        kind=None,
+        kind=dummy_tvar(),
       )
     ["Mul", e1, e2] =>
       Prim(
         e1 |> Syntax::from_json!(),
         e2 |> Syntax::from_json!(),
         Mul,
-        kind=None,
+        kind=dummy_tvar(),
       )
     ["Div", e1, e2] =>
       Prim(
         e1 |> Syntax::from_json!(),
         e2 |> Syntax::from_json!(),
         Div,
-        kind=None,
+        kind=dummy_tvar(),
       )
     ["FAdd", e1, e2] =>
       Syntax::Prim(
         e1 |> Syntax::from_json!(),
         e2 |> Syntax::from_json!(),
         Add,
-        kind=Some(Double),
+        kind=Double,
       )
     ["FSub", e1, e2] =>
       Prim(
         e1 |> Syntax::from_json!(),
         e2 |> Syntax::from_json!(),
         Sub,
-        kind=Some(Double),
+        kind=Double,
       )
     ["FMul", e1, e2] =>
       Prim(
         e1 |> Syntax::from_json!(),
         e2 |> Syntax::from_json!(),
         Mul,
-        kind=Some(Double),
+        kind=Double,
       )
     ["FDiv", e1, e2] =>
       Prim(
         e1 |> Syntax::from_json!(),
         e2 |> Syntax::from_json!(),
         Div,
-        kind=Some(Kind::Double),
+        kind=Double,
       )
     ["Eq", e1, e2] => Eq(e1 |> Syntax::from_json!(), e2 |> Syntax::from_json!())
     ["LE", e1, e2] => LE(e1 |> Syntax::from_json!(), e2 |> Syntax::from_json!())
@@ -395,39 +440,39 @@ test {
   )
   inspect!(
     Syntax::from_json!(["Neg", ["Int", 1]]),
-    content="Neg(Int(1), kind=None)",
+    content="Neg(Int(1), kind=Var({val: Err((4, @immut/sorted_set.of([])))}))",
   )
   inspect!(
     Syntax::from_json!(["Add", ["Int", 1], ["Int", 2]]),
-    content="Prim(Int(1), Int(2), Add, kind=None)",
+    content="Prim(Int(1), Int(2), Add, kind=Var({val: Err((5, @immut/sorted_set.of([])))}))",
   )
   inspect!(
     Syntax::from_json!(["Sub", ["Int", 1], ["Int", 2]]),
-    content="Prim(Int(1), Int(2), Sub, kind=None)",
+    content="Prim(Int(1), Int(2), Sub, kind=Var({val: Err((6, @immut/sorted_set.of([])))}))",
   )
   inspect!(
     Syntax::from_json!(["Mul", ["Int", 1], ["Int", 2]]),
-    content="Prim(Int(1), Int(2), Mul, kind=None)",
+    content="Prim(Int(1), Int(2), Mul, kind=Var({val: Err((7, @immut/sorted_set.of([])))}))",
   )
   inspect!(
     Syntax::from_json!(["Div", ["Int", 1], ["Int", 2]]),
-    content="Prim(Int(1), Int(2), Div, kind=None)",
+    content="Prim(Int(1), Int(2), Div, kind=Var({val: Err((8, @immut/sorted_set.of([])))}))",
   )
   inspect!(
     Syntax::from_json!(["FAdd", ["Float", 1.0], ["Float", 2.0]]),
-    content="Prim(Double(1), Double(2), Add, kind=Some(Double))",
+    content="Prim(Double(1), Double(2), Add, kind=Double)",
   )
   inspect!(
     Syntax::from_json!(["FSub", ["Float", 1.0], ["Float", 2.0]]),
-    content="Prim(Double(1), Double(2), Sub, kind=Some(Double))",
+    content="Prim(Double(1), Double(2), Sub, kind=Double)",
   )
   inspect!(
     Syntax::from_json!(["FMul", ["Float", 1.0], ["Float", 2.0]]),
-    content="Prim(Double(1), Double(2), Mul, kind=Some(Double))",
+    content="Prim(Double(1), Double(2), Mul, kind=Double)",
   )
   inspect!(
     Syntax::from_json!(["FDiv", ["Float", 1.0], ["Float", 2.0]]),
-    content="Prim(Double(1), Double(2), Div, kind=Some(Double))",
+    content="Prim(Double(1), Double(2), Div, kind=Double)",
   )
   inspect!(
     Syntax::from_json!(["Eq", ["Int", 1], ["Int", 2]]),
@@ -453,4 +498,28 @@ test {
       #|Var("x")
     ,
   )
+}
+
+pub fn Syntax::clone(self : Syntax) -> Syntax {
+  let rec = Syntax::clone
+  match self {
+    Unit | Bool(_) | Int(_) | Double(_) | Var(_) as s => s
+    Tuple(tup) => Tuple(tup.map(rec))
+    Not(s) => Not(rec(s))
+    Array(len, ele) => Array(rec(len), rec(ele))
+    Neg(s, ~kind) => Neg(rec(s), kind=kind.clone())
+    App(f, args) => App(rec(f), args.map(rec))
+    Get(arr, idx) => Get(rec(arr), rec(idx))
+    If(_test, _then, _else) => If(rec(_test), rec(_then), rec(_else))
+    Prim(lhs, rhs, op, ~kind) => Prim(rec(lhs), rec(rhs), op, kind=kind.clone())
+    Eq(lhs, rhs) => Eq(rec(lhs), rec(rhs))
+    LE(lhs, rhs) => LE(rec(lhs), rec(rhs))
+    Let((name, ty), rhs, rest) => Let((name, ty.clone()), rec(rhs), rec(rest))
+    LetRec(f, rest) => LetRec(f.clone(), rest.clone())
+    LetTuple(tup, rhs, rest) => {
+      let tup_new = tup.map(fn { (name, ty) => (name, ty.clone()) })
+      LetTuple(tup_new, rec(rhs), rec(rest))
+    }
+    Put(lhs, rhs, rest) => Put(rec(lhs), rec(rhs), rec(rest))
+  }
 }

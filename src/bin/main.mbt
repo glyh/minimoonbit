@@ -93,8 +93,9 @@ fn CompileStatus::step(self : CompileStatus) -> Bool {
       self.ast = Some(parsed)
     }
     Typecheck => {
-      let typechecked = @util.die("TODO: typecheck")
-      self.typechecked = Some(typechecked)
+      let to_check = self.ast.unwrap().clone()
+      @typing.infer_type(@immut/sorted_map.empty(), to_check)
+      self.typechecked = Some(to_check)
     }
     Knf => {
       let knf = self.knf_env.to_knf(self.typechecked.unwrap())
