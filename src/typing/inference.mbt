@@ -106,7 +106,7 @@ fn inference_constraints(env : TyEnv, s : S) -> (T, Array[Constraint]) {
     Int(_) => (T::Int, [])
     Double(_) => (T::Double, [])
     Var(name) =>
-      match env.lookup(name) {
+      match env[name] {
         None => @util.die("Undefined Variable: \{name}")
         Some(ty) => (ty, [])
       }
@@ -187,32 +187,33 @@ fn inference_constraints(env : TyEnv, s : S) -> (T, Array[Constraint]) {
     }
     Let((bind_id, bind_ty), rhs, rest) => {
       let (rhs_ty, rhs_cons) = inference_constraints(env, rhs)
-      let env_new = env.insert(bind_id, bind_ty)
+      let env_new = env.add(bind_id, bind_ty)
       let (ret_ty, cs_out) = inference_constraints(env_new, rest)
       cs_out.push((rhs_ty, bind_ty))
       cs_out.append(rhs_cons)
       (ret_ty, cs_out)
     }
     LetRec(f, rest) => {
-      let fn_ty = T::Fun(f.args.map(fn { (_1, _2) => _2 }), f.name.1)
       fn update_env(env : TyEnv, arg : (Symbol, T)) {
-        env.insert(arg.0, arg.1)
+        env.add(arg.0, arg.1)
       }
 
-      let env_with_fn = update_env(env, (f.name.0, fn_ty))
+      let env_with_fn = update_env(env, f.name)
       let env_with_fn_and_args = f.args.fold(init=env_with_fn, update_env)
       let (body_ty, lambda_cons) = inference_constraints(
         env_with_fn_and_args,
         f.body,
       )
-      lambda_cons.push((body_ty, f.name.1))
+      lambda_cons.push(
+        (T::Fun(f.args.map(fn { (_1, ty) => ty }), body_ty), f.name.1),
+      )
 
       // HACK: let-polymorphism
       //let env_generalized = generalize(lambda_cons, env, f.name.0, fn_ty)
       //let (ret_ty, cs_out) = inference_constraints(env_generalized, rest)
       //(ret_ty, cs_out)
 
-      let env_new = env.insert(f.name.0, fn_ty)
+      let env_new = env.add(f.name.0, f.name.1)
       let (ret_ty, cs_out) = inference_constraints(env_new, rest)
       cs_out.append(lambda_cons)
       (ret_ty, cs_out)
@@ -220,7 +221,7 @@ fn inference_constraints(env : TyEnv, s : S) -> (T, Array[Constraint]) {
     LetTuple(tup, rhs, rest) => {
       let (rhs_ty, rhs_cons) = inference_constraints(env, rhs)
       fn update_env(env : TyEnv, arg : (Symbol, T)) {
-        env.insert(arg.0, arg.1)
+        env.add(arg.0, arg.1)
       }
 
       let env_new = tup.fold(init=env, update_env)
@@ -288,10 +289,10 @@ fn ensure_inference(exp : S) -> Unit {
         @util.die("Unknown type for \{exp}")
       }
     }
-    LetRec({ name: (_, ret_ty), args, body }, rest) => {
+    LetRec({ name: (_, fn_ty), args, body }, rest) => {
       rec(body)
       rec(rest)
-      if not(ret_ty.is_known()) {
+      if not(fn_ty.is_known()) {
         @util.die("Unknown type for \{exp}")
       }
       args.each(
@@ -323,28 +324,8 @@ fn ensure_inference(exp : S) -> Unit {
   }
 }
 
-let default_env : TyEnv = @immut/sorted_map.of(
-  [
-    ("read_int", T::Fun([], T::Int)),
-    ("print_int", T::Fun([T::Int], T::Unit)),
-    ("read_char", T::Fun([], T::Int)),
-    ("print_char", T::Fun([T::Int], T::Unit)),
-    ("print_newline", T::Fun([], T::Unit)),
-    ("int_of_float", T::Fun([T::Double], T::Int)),
-    ("float_of_int", T::Fun([T::Int], T::Double)),
-    ("truncate", T::Fun([T::Double], T::Int)),
-    ("floor", T::Fun([T::Double], T::Double)),
-    ("abs_float", T::Fun([T::Double], T::Double)),
-    ("abs_float", T::Fun([T::Double], T::Double)),
-    ("sqrt", T::Fun([T::Double], T::Double)),
-    ("sin", T::Fun([T::Double], T::Double)),
-    ("cos", T::Fun([T::Double], T::Double)),
-    ("atan", T::Fun([T::Double], T::Double)),
-  ],
-)
-
 pub fn infer_type(exp : S) -> Unit {
-  let (_, cons) = inference_constraints(default_env, exp)
+  let (_, cons) = inference_constraints(@types.externals, exp)
   unify(cons)
   ensure_inference(exp)
 }

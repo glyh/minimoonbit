@@ -1,6 +1,6 @@
 enum DefoldPre {
   Let(String, Type, S)
-  LetRec(F)
+  LetRec(@types.Fundef)
 }
 
 /// Preprocesses the syntax tree, extracting the contents of functions `main` and `init` to top-level.

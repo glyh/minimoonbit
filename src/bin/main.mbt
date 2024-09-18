@@ -58,7 +58,7 @@ fn CompileStatus::initialize(
     source_code: None,
     ast: None,
     typechecked: None,
-    knf_env: @knf.KnfEnv::new(externals()),
+    knf_env: @knf.KnfEnv::new(@types.externals),
     knf: None,
     opt_knf: None,
     closure_ir: None,
@@ -109,7 +109,7 @@ fn CompileStatus::step(self : CompileStatus) -> Bool {
     Closure => {
       let closure_ir = @closure.knf_program_to_closure(
         self.opt_knf.unwrap(),
-        Map::from_iter(externals().iter()),
+        Map::from_iter(@types.externals.iter()),
       )
       self.closure_ir = Some(closure_ir)
     }

@@ -76,4 +76,4 @@ typealias Constraint = (T, T)
 
 typealias Symbol = String
 
-typealias TyEnv = @immut/sorted_map.T[Symbol, T]
+typealias TyEnv = @immut/hashmap.T[Symbol, T]
