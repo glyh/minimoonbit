@@ -6,8 +6,6 @@ alias @moonbitlang/minimbt as @minimbt
 fn parse_program(String) -> @minimbt.Syntax
 
 // Types and methods
-type GetApplyPostFix
-
 type Parser
 
 // Type aliases

@@ -1,6 +1,11 @@
 package moonbitlang/minimbt
 
+alias @moonbitlang/core/immut/sorted_set as @sorted_set
+
 // Values
+fn classed_tvar(FixedArray[TClass]) -> Type
+
+fn dummy_tvar() -> Type
 
 // Types and methods
 pub struct Fundef {
@@ -9,17 +14,9 @@ pub struct Fundef {
   pub body : Syntax
 }
 impl Fundef {
+  clone(Self) -> Self
   from_json(Json) -> Self!
   to_json(Self) -> Json
-  to_string(Self) -> String
-}
-
-pub enum Kind {
-  Int
-  Double
-}
-impl Kind {
-  op_equal(Self, Self) -> Bool
   to_string(Self) -> String
 }
 
@@ -60,11 +57,11 @@ pub enum Syntax {
   Tuple(Array[Syntax])
   Not(Syntax)
   Array(Syntax, Syntax)
-  Neg(Syntax, Kind?)
+  Neg(Syntax, Type)
   App(Syntax, Array[Syntax])
   Get(Syntax, Syntax)
   If(Syntax, Syntax, Syntax)
-  Prim(Syntax, Syntax, Op, Kind?)
+  Prim(Syntax, Syntax, Op, Type)
   Eq(Syntax, Syntax)
   LE(Syntax, Syntax)
   Let((String, Type), Syntax, Syntax)
@@ -73,8 +70,19 @@ pub enum Syntax {
   Put(Syntax, Syntax, Syntax)
 }
 impl Syntax {
+  clone(Self) -> Self
   from_json(Json) -> Self!
   to_json(Self) -> Json
+  to_string(Self) -> String
+}
+
+pub enum TClass {
+  Arith
+  Order
+}
+impl TClass {
+  compare(Self, Self) -> Int
+  op_equal(Self, Self) -> Bool
   to_string(Self) -> String
 }
 
@@ -83,16 +91,19 @@ pub enum Type {
   Bool
   Int
   Double
+  Ptr
   Fun(Array[Type], Type)
   Tuple(Array[Type])
   Array(Type)
-  Var(Ref[Type?])
-  Ptr
+  Var(Ref[Result[Type, (Int, @sorted_set.T[TClass])]])
 }
 impl Type {
+  clone(Self) -> Self
   from_json(Json) -> Self!
   is_float_like(Self) -> Bool
+  is_known(Self) -> Bool
   is_ptr_like(Self) -> Bool
+  normalize(Self) -> Self
   op_equal(Self, Self) -> Bool
   size_of(Self, Int) -> Int
   to_json(Self) -> Json
@@ -100,19 +111,24 @@ impl Type {
 }
 
 // Type aliases
+pub typealias TClasses = @sorted_set.T[TClass]
+
+pub typealias TVar = (Int, @sorted_set.T[TClass])
+
+pub typealias Vid = Int
 
 // Traits
 
 // Extension Methods
 impl Show for Fundef
 
-impl Show for Kind
-
 impl Show for Name
 
 impl Show for Op
 
 impl Show for Syntax
+
+impl Show for TClass
 
 impl Show for Type
 

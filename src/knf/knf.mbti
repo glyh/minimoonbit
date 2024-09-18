@@ -7,6 +7,8 @@ alias @moonbitlang/minimbt as @minimbt
 fn knf_max_counter(Knf) -> Int
 
 // Types and methods
+type DefoldPre
+
 pub struct FuncDef {
   pub name : @minimbt.Name
   pub ty : @minimbt.Type

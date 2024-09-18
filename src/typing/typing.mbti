@@ -1,12 +1,29 @@
 package moonbitlang/minimbt/typing
 
+alias @moonbitlang/core/immut/sorted_set as @sorted_set
+alias @moonbitlang/minimbt as @minimbt
+
 // Values
+fn infer_type(@minimbt.Syntax) -> Unit
 
 // Types and methods
+type TVarSet
+impl TVarSet {
+  contains(Self, Int) -> Bool
+  discard(Self, Int) -> Self
+  discard_var(Self, (Int, @sorted_set.T[@minimbt.TClass])) -> Self
+  insert(Self, Int, ~classes : @sorted_set.T[@minimbt.TClass] = ..) -> Self
+  insert_var(Self, (Int, @sorted_set.T[@minimbt.TClass])) -> Self
+  op_add(Self, Self) -> Self
+  op_equal(Self, Self) -> Bool
+  op_sub(Self, Self) -> Self
+  to_string(Self) -> String
+}
 
 // Type aliases
 
 // Traits
 
 // Extension Methods
+impl Show for TVarSet
 

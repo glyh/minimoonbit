@@ -1,3 +1,4 @@
+// REF: https://esumii.github.io/min-caml/tutorial-mincaml-9.eng.htm
 pub typealias LocalEnv = @immut/hashmap.T[String, Type]
 
 struct KnfEnv {
@@ -28,6 +29,22 @@ fn KnfEnv::new_named_temp(self : KnfEnv, name : Name) -> Name {
   { ..name, slot: counter }
 }
 
-pub fn KnfEnv::to_knf(self : KnfEnv, _s : @types.Syntax) -> Knf { // !Failure
-  abort("todo")
+//fn KnfEnv::new_named(self : KnfEnv, name : String) -> Name {
+//  let counter = self.counter
+//  self.counter += 1
+//  { name: Some(name), slot: counter }
+//}
+//
+
+pub fn KnfEnv::to_knf(self : KnfEnv, s : S) -> Knf {
+  let rec = fn { s => self.to_knf(s) }
+  match s {
+    Unit => Unit
+    Bool(true) => Int(1)
+    Bool(false) => Int(0)
+    Int(i) => Int(i)
+    Double(f) => Double(f)
+    //Var(name) => Var(self.new_named(name))
+    //Tuple(tup) => tup.fold
+  }
 }
