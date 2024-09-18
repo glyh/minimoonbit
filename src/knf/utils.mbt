@@ -64,3 +64,70 @@ pub fn knf_max_counter(knf : Knf) -> Int {
     ExternalArray(_) => 0
   }
 }
+
+enum KnfHead {
+  Let(Name, Type, Knf)
+  LetRec(FuncDef)
+}
+
+type KnfHeadQ Array[KnfHead]
+
+fn KnfHeadQ::push(self : KnfHeadQ, env : KnfEnv, ele : (Knf, Type)) -> Unit {
+  let tmp = env.new_temp()
+  self._.push(Let(tmp, ele.1, ele.0))
+}
+
+fn KnfHeadQ::push_fn(self : KnfHeadQ, f : FuncDef) -> Unit {
+  self._.push(LetRec(f))
+}
+
+fn KnfHeadQ::push_named(
+  self : KnfHeadQ,
+  env : KnfEnv,
+  ele : (Knf, Type),
+  name : String
+) -> Unit {
+  let tmp = env.new_name(name)
+  self._.push(Let(tmp, ele.1, ele.0))
+}
+
+fn KnfHeadQ::new() -> KnfHeadQ {
+  KnfHeadQ([])
+}
+
+fn KnfHead::get_name(self : KnfHead) -> N {
+  match self {
+    Let(name, _, _) => name
+    LetRec({ name, .. }) => name
+  }
+}
+
+fn KnfHead::get_type(self : KnfHead) -> T {
+  match self {
+    Let(_, ty, _) => ty
+    LetRec({ ty, .. }) => ty
+  }
+}
+
+fn KnfHeadQ::at(self : KnfHeadQ, id : Int) -> Name {
+  self._[id].get_name()
+}
+
+fn KnfHeadQ::all_names(self : KnfHeadQ) -> Array[Name] {
+  self._.map(KnfHead::get_name)
+}
+
+fn KnfHeadQ::all_types(self : KnfHeadQ) -> Array[Type] {
+  self._.map(KnfHead::get_type)
+}
+
+fn KnfHeadQ::refold_knf(self : KnfHeadQ, init : Knf) -> Knf {
+  fn fold1(acc : Knf, ele : KnfHead) -> Knf {
+    match ele {
+      Let(name, ty, rhs) => Let((name, ty), rhs, acc)
+      LetRec(f) => LetRec(f, acc)
+    }
+  }
+
+  self._.rev_fold(~init, fold1)
+}

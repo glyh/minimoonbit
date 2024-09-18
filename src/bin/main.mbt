@@ -94,11 +94,13 @@ fn CompileStatus::step(self : CompileStatus) -> Bool {
     }
     Typecheck => {
       let to_check = self.ast.unwrap().clone()
-      @typing.infer_type(to_check)
-      self.typechecked = Some(to_check)
+      self.typechecked = Some(@typing.infer_type(to_check))
     }
     Knf => {
-      let knf = self.knf_env.to_knf(self.typechecked.unwrap())
+      let preprocessed = self.knf_env.syntax_preprocess(
+        self.typechecked.unwrap(),
+      )
+      let knf = self.knf_env.to_knf(preprocessed)
       self.knf = Some(knf)
     }
     KnfOpt => {

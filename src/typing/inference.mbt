@@ -242,90 +242,82 @@ fn inference_constraints(env : TyEnv, s : S) -> (T, Array[Constraint]) {
   }
 }
 
-fn ensure_inference(exp : S) -> Unit {
-  let rec = ensure_inference
+// 1. ensures every type annotated on the tree is inferred
+// 2. normalize any types
+fn post_infer_check(exp : S) -> S {
+  let rec = post_infer_check
   match exp {
-    Unit | Bool(_) | Int(_) | Double(_) | Var(_) => ()
-    Tuple(tup) => tup.each(rec)
+    Unit | Bool(_) | Int(_) | Double(_) | Var(_) => exp
+    Tuple(tup) => Tuple(tup.map(rec))
     Not(e) => rec(e)
-    Array(len, ele) => {
-      rec(len)
-      rec(ele)
-    }
+    Array(len, ele) => Array(rec(len), rec(ele))
     Neg(e, ~kind) => {
-      rec(e)
-      if not(kind.is_known()) {
+      let k_norm = kind.normalize()
+      if not(k_norm.is_known()) {
         @util.die("Unknown type for \{exp}")
       }
+      Neg(rec(e), kind=k_norm)
     }
-    App(f, args) => {
-      rec(f)
-      args.each(rec)
-    }
-    Get(arr, idx) => {
-      rec(arr)
-      rec(idx)
-    }
-    If(_test, _then, _else) => {
-      rec(_test)
-      rec(_then)
-      rec(_else)
-    }
-    Prim(lhs, rhs, _, ~kind) => {
-      rec(lhs)
-      rec(rhs)
-      if not(kind.is_known()) {
+    App(f, args) => App(rec(f), args.map(rec))
+    Get(arr, idx) => Get(rec(arr), rec(idx))
+    If(_test, _then, _else) => If(rec(_test), rec(_then), rec(_else))
+    Prim(lhs, rhs, op, ~kind) => {
+      let k_norm = kind.normalize()
+      if not(k_norm.is_known()) {
         @util.die("Unknown type for \{exp}")
       }
+      Prim(rec(lhs), rec(rhs), op, kind=k_norm)
     }
-    Eq(lhs, rhs) | LE(lhs, rhs) => {
-      rec(lhs)
-      rec(rhs)
-    }
-    Let((_, ty), rhs, rest) => {
-      rec(rhs)
-      rec(rest)
-      if not(ty.is_known()) {
+    Eq(lhs, rhs) => Eq(rec(lhs), rec(rhs))
+    LE(lhs, rhs) => LE(rec(lhs), rec(rhs))
+    Let((name, ty), rhs, rest) => {
+      let ty_norm = ty.normalize()
+      if not(ty_norm.is_known()) {
         @util.die("Unknown type for \{exp}")
       }
+      Let((name, ty_norm), rec(rhs), rec(rest))
     }
-    LetRec({ name: (_, fn_ty), args, body }, rest) => {
-      rec(body)
-      rec(rest)
-      if not(fn_ty.is_known()) {
+    LetRec({ name: (fn_name, fn_ty), args, body }, rest) => {
+      let fn_ty_norm = fn_ty.normalize()
+      if not(fn_ty_norm.is_known()) {
         @util.die("Unknown type for \{exp}")
       }
-      args.each(
+      let args_norm = args.map(
         fn {
-          (_, ty) =>
-            if not(ty.is_known()) {
+          (name, ty) => {
+            let arg_ty_norm = ty.normalize()
+            if not(arg_ty_norm.is_known()) {
               @util.die("Unknown type for \{exp}")
             }
+            (name, arg_ty_norm)
+          }
         },
+      )
+      LetRec(
+        { name: (fn_name, fn_ty_norm), args: args_norm, body: rec(body) },
+        rec(rest),
       )
     }
     LetTuple(tup, rhs, rest) => {
-      rec(rhs)
-      rec(rest)
-      tup.each(
+      let tup_norm = tup.map(
         fn {
-          (_, ty) =>
-            if not(ty.is_known()) {
+          (name, ty) => {
+            let ty_norm = ty.normalize()
+            if not(ty_norm.is_known()) {
               @util.die("Unknown type for \{exp}")
             }
+            (name, ty_norm)
+          }
         },
       )
+      LetTuple(tup_norm, rec(rhs), rec(rest))
     }
-    Put(lhs, rhs, rest) => {
-      rec(lhs)
-      rec(rhs)
-      rec(rest)
-    }
+    Put(lhs, rhs, rest) => Put(rec(lhs), rec(rhs), rec(rest))
   }
 }
 
-pub fn infer_type(exp : S) -> Unit {
+pub fn infer_type(exp : S) -> S {
   let (_, cons) = inference_constraints(@types.externals, exp)
   unify(cons)
-  ensure_inference(exp)
+  post_infer_check(exp)
 }
