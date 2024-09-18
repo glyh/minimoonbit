@@ -4,12 +4,12 @@ enum DefoldPre {
 }
 
 /// Preprocesses the syntax tree, extracting the contents of functions `main` and `init` to top-level.
-pub fn KnfEnv::syntax_preprocess(_self : KnfEnv, s : S) -> S {
+pub fn KnfEnv::syntax_preprocess(_self : KnfEnv, toplevel : S) -> S {
   let defolded : Array[DefoldPre] = []
   let mut main_body : S? = None
   let mut init_body : S? = None
   let used_names : @hashset.T[String] = @hashset.new()
-  loop s {
+  loop toplevel {
     Unit => break
     LetRec({ name: (name, _), body, .. } as f, rest) => {
       if used_names.contains(name) {
