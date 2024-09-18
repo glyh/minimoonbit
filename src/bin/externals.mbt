@@ -10,7 +10,7 @@ fn add_interpreter_fns(interpreter : @knf_eval.KnfInterpreter) -> Unit {
     },
   )
   interpreter.add_extern_fn(
-    "minimbt_print_endline",
+    "minimbt_print_newline",
     fn(_args) {
       @io.print("\n")
       Unit
@@ -104,7 +104,7 @@ fn add_closure_interpreter_fns(
     },
   )
   interpreter.add_extern_fn(
-    "minimbt_print_endline",
+    "minimbt_print_newline",
     fn(_args) {
       @io.print("\n")
       Unit
@@ -190,7 +190,7 @@ fn externals() -> @immut/hashmap.T[String, @types.Type] {
   .add("read_char", @types.Fun([], Int))
   .add("print_int", @types.Fun([Int], Unit))
   .add("print_char", @types.Fun([Int], Unit))
-  .add("print_endline", @types.Fun([], Unit))
+  .add("print_newline", @types.Fun([], Unit))
   .add("create_array", @types.Fun([Int, Int], @types.Type::Array(Int)))
   .add(
     "create_float_array",
