@@ -249,7 +249,7 @@ fn post_infer_check(exp : S) -> S {
   match exp {
     Unit | Bool(_) | Int(_) | Double(_) | Var(_) => exp
     Tuple(tup) => Tuple(tup.map(rec))
-    Not(e) => rec(e)
+    Not(e) => Not(rec(e))
     Array(len, ele) => Array(rec(len), rec(ele))
     Neg(e, ~kind) => {
       let k_norm = kind.normalize()
