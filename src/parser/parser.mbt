@@ -4,7 +4,9 @@ fn tier_left(op : Parser[B], next : Parser[S]) -> Parser[S] {
     next,
     op.map(
       fn(op) {
-        fn(lhs, rhs) { S::Prim(lhs, rhs, op, kind=@types.dummy_tvar()) }
+        fn(lhs, rhs) {
+          S::Prim(lhs, rhs, op, kind=@types.classed_tvar([Arith]))
+        }
       },
     ),
   )
@@ -73,7 +75,9 @@ fn parser() -> PS {
     block_expr +
     (
       tok(@lex.SUB) >>
-      ref(value_ref).map(fn { x => S::Neg(x, kind=@types.dummy_tvar()) })
+      ref(value_ref).map(
+        fn { x => S::Neg(x, kind=@types.classed_tvar([Arith])) },
+      )
     ) +
     double.map(S::Double) +
     int.map(S::Int) +

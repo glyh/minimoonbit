@@ -99,3 +99,18 @@ pub fn Type::op_equal(self : Type, other : Type) -> Bool {
     _ => false
   }
 }
+
+pub fn Type::is_known(self : Type) -> Bool {
+  fn all_known(arr : Array[Type]) {
+    arr.fold(init=true, fn(acc : Bool, ele : Type) { acc && ele.is_known() })
+  }
+
+  match self {
+    Unit | Bool | Int | Double | Ptr => true
+    Fun(args, ret) => all_known(args) && ret.is_known()
+    Tuple(tup) => all_known(tup)
+    Array(t) => t.is_known()
+    Var({ val: Ok(t) }) => t.is_known()
+    Var({ val: Err(_) }) => false
+  }
+}

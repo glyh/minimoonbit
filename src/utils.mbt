@@ -80,13 +80,16 @@ test "Clone type works" {
   let t1 = dummy_tvar()
   match t1 {
     Var(ref) => ref.val = Ok(Int)
+    _ => panic()
   }
   let t2 = t1.clone()
   match t2 {
     Var(ref) => ref.val = Ok(Double)
+    _ => panic()
   }
   match t1 {
     Var(ref) => assert_eq!(ref.val, Ok(Int))
+    _ => panic()
   }
 }
 

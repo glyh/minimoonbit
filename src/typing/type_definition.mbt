@@ -58,10 +58,13 @@ typealias Subst = @immut/sorted_map.T[Vid, T]
 fn check_classes(t : T, clss : TClasses) -> Unit {
   fn helper(ty : T) -> (TClass) -> Unit {
     fn(cls) {
-      match (ty, cls) {
-        (Int | Double, Arith) => ()
-        (Int | Double | Bool, Order) => ()
-        (ty, cls) => @util.die("\{ty} doesn't implement typeclass \{cls}")
+      // We can't use a regular pattern matching here as we have tvars
+      let ok = match cls {
+        Arith => ty == Int || ty == Double
+        Order => ty == Int || ty == Double || ty == Bool
+      }
+      if not(ok) {
+        @util.die("\{ty} doesn't implement typeclass \{cls}")
       }
     }
   }

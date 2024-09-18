@@ -4,7 +4,8 @@
 // 3. My own work at https://github.com/glyh/wyah/blob/master/lib/type_inference.ml
 
 // NOTE: 
-// Constraint based STLC inference with additonal of type class(for polymorphic operators)
+// - Constraint based STLC inference with typeclass(for polymorphic operators)
+// - We don't actually need substitution here as it's done by directly writing into the pointers
 
 fn free_variables(t : T) -> TVarSet {
   match t {
@@ -20,50 +21,6 @@ fn free_variables(t : T) -> TVarSet {
   }
 }
 
-fn apply_sub_ty(s : Subst, target : T) -> T {
-  fn rec(t : T) {
-    apply_sub_ty(s, t)
-  }
-
-  match target {
-    Unit | Bool | Int | Double | Ptr as t => t
-    Fun(args, ret) => Fun(args.map(rec), rec(ret))
-    Tuple(tup) => Tuple(tup.map(rec))
-    Array(t) => Array(rec(t))
-    // NOTE: we rely on the uniqueness of the generated type var to ensure binder
-    // is not substituted here 
-    Var({ val: Ok(t) } as ref) as ret => {
-      ref.val = Ok(rec(t))
-      ret
-    }
-    Var({ val: Err(t) } as ref) as ret => {
-      match s[t.0] {
-        Some(ty) => ref.val = Ok(ty)
-        None => ()
-      }
-      ret
-    }
-  }
-}
-
-fn apply_sub_sub(s_applied : Subst, s_target : Subst) -> Subst {
-  s_target.iter().map(fn { (k, v) => (k, apply_sub_ty(s_applied, v)) })
-  |> @immut/sorted_map.from_iter
-}
-
-fn apply_sub_cs(s : Subst, eq_cons : Array[Constraint]) -> Array[Constraint] {
-  fn rec(ty) {
-    apply_sub_ty(s, ty)
-  }
-
-  eq_cons.map(fn { (lhs, rhs) => (rec(lhs), rec(rhs)) })
-}
-
-fn apply_sub_env(s : Subst, env : TyEnv) -> TyEnv {
-  env.iter().map(fn { (k, v) => (k, apply_sub_ty(s, v)) })
-  |> @immut/sorted_map.from_iter
-}
-
 typealias Resolved = (Ref[Result[T, TVar]], T)
 
 fn unify_one(c : Constraint) -> (Resolved?, Array[Constraint]) {
@@ -74,7 +31,7 @@ fn unify_one(c : Constraint) -> (Resolved?, Array[Constraint]) {
   match c {
     (Fun(args1, ret1), Fun(args2, ret2)) =>
       if args1.length() != args2.length() {
-        @util.die("Unification failure\{c}")
+        @util.die("Args number mismatch for function unification \{c}")
       } else {
         let cs = args1.mapi(fn(i, arg1) { (arg1, args2[i]) })
         cs.push((ret1, ret2))
@@ -82,7 +39,7 @@ fn unify_one(c : Constraint) -> (Resolved?, Array[Constraint]) {
       }
     (Tuple(tup1), Tuple(tup2)) =>
       if tup1.length() != tup2.length() {
-        @util.die("Unification failure\{c}")
+        @util.die("Tuple size mismatch for unification \{c}")
       } else {
         let cs = tup1.mapi(fn(i, t1) { (t1, tup2[i]) })
         (None, cs)
@@ -108,8 +65,23 @@ fn unify(cs : Array[Constraint]) -> Unit {
           (Some(({ val: Ok(ti) }, tj)), cs_new) =>
             if ti != tj {
               @util.die("Can't unify between \{ti} and \{tj}")
+            } else {
+              cs.append(cs_new)
             }
-          (Some(({ val: Err((id, clss)) } as ref, tj)), cs_new) => {
+          (
+            Some(
+              (
+                { val: Err((id1, clss1)) } as ref1,
+                Var({ val: Err((id2, clss2)) } as ref2),
+              )
+            ), // both var unknown, we just need to union their clsses
+            cs_new,
+          ) => {
+            ref1.val = Err((id1, clss1.union(clss2)))
+            ref2.val = Err((id2, clss1.union(clss2)))
+            cs.append(cs_new)
+          }
+          (Some(({ val: Err((_, clss)) } as ref, tj)), cs_new) => {
             check_classes(tj, clss)
             ref.val = Ok(tj)
             //NOTE: no need to apply the subsitution into cs_new here, as we're using references
@@ -148,36 +120,33 @@ fn inference_constraints(env : TyEnv, s : S) -> (T, Array[Constraint]) {
       (Tuple(ty_out_arr), cs_out)
     }
     Not(bool) => {
-      let (ty_bool, cs_bool) = rec(bool)
-      let cs_out : Array[Constraint] = [(ty_bool, T::Bool)]
-      cs_out.append(cs_bool)
+      let (ty_bool, cs_out) = rec(bool)
+      cs_out.push((ty_bool, T::Bool))
       (T::Bool, cs_out)
     }
     Array(len, ele) => {
-      let (ty_len, cs_len) = rec(len)
+      let (ty_len, cs_out) = rec(len)
       let (ty_ele, cs_ele) = rec(ele)
-      let cs_out : Array[Constraint] = [(ty_len, T::Int)]
-      cs_out.append(cs_len)
       cs_out.append(cs_ele)
+      cs_out.push((ty_len, T::Int))
       (Array(ty_ele), cs_out)
     }
-    Neg(numeric, kind=_) => {
-      let (ty_inner, cs_inner) = rec(numeric)
-      let class_var = @types.classed_tvar([Arith])
-      cs_inner.push((class_var, ty_inner))
-      (ty_inner, cs_inner)
+    Neg(numeric, ~kind) => {
+      let (ty_inner, cs_out) = rec(numeric)
+      cs_out.push((kind, ty_inner))
+      (ty_inner, cs_out)
     }
     App(f, params) => {
       let (f_ty, cs_out) = rec(f)
-      let ty_params_out : Array[T] = []
+      let ty_params : Array[T] = []
       for pi in params.iter() {
         let (ty_i, cs_i) = rec(pi)
-        ty_params_out.push(ty_i)
+        ty_params.push(ty_i)
         cs_out.append(cs_i)
       }
-      let return_var = @types.dummy_tvar()
-      cs_out.push((f_ty, Fun(ty_params_out, return_var)))
-      (return_var, cs_out)
+      let ty_ret = @types.dummy_tvar()
+      cs_out.push((f_ty, Fun(ty_params, ty_ret)))
+      (ty_ret, cs_out)
     }
     Get(arr, index) => {
       let (arr_ty, cs_out) = rec(arr)
@@ -203,8 +172,7 @@ fn inference_constraints(env : TyEnv, s : S) -> (T, Array[Constraint]) {
       let (rhs_ty, cs_rhs) = rec(rhs)
       cs_out.append(cs_rhs)
       cs_out.push((lhs_ty, rhs_ty))
-      let class_var = @types.classed_tvar([Arith])
-      cs_out.push((class_var, lhs_ty))
+      cs_out.push((kind, lhs_ty))
       (lhs_ty, cs_out)
     }
     Eq(lhs, rhs) | LE(lhs, rhs) => {
@@ -213,6 +181,7 @@ fn inference_constraints(env : TyEnv, s : S) -> (T, Array[Constraint]) {
       cs_out.append(cs_rhs)
       cs_out.push((lhs_ty, rhs_ty))
       let class_var = @types.classed_tvar([Order])
+      cs_out.push((class_var, lhs_ty))
       (T::Bool, cs_out)
     }
     Let((bind_id, bind_ty), rhs, rest) => {
@@ -230,7 +199,7 @@ fn inference_constraints(env : TyEnv, s : S) -> (T, Array[Constraint]) {
       }
 
       let env_with_fn = update_env(env, (f.name.0, fn_ty))
-      let env_with_fn_and_args = f.args.fold(init=env, update_env)
+      let env_with_fn_and_args = f.args.fold(init=env_with_fn, update_env)
       let (body_ty, lambda_cons) = inference_constraints(
         env_with_fn_and_args,
         f.body,
@@ -243,9 +212,9 @@ fn inference_constraints(env : TyEnv, s : S) -> (T, Array[Constraint]) {
       //(ret_ty, cs_out)
 
       let env_new = env.insert(f.name.0, fn_ty)
-      let (ret_ty, cs_rest) = inference_constraints(env_new, rest)
-      cs_rest.append(lambda_cons)
-      (ret_ty, cs_rest)
+      let (ret_ty, cs_out) = inference_constraints(env_new, rest)
+      cs_out.append(lambda_cons)
+      (ret_ty, cs_out)
     }
     LetTuple(tup, rhs, rest) => {
       let (rhs_ty, rhs_cons) = inference_constraints(env, rhs)
@@ -271,7 +240,110 @@ fn inference_constraints(env : TyEnv, s : S) -> (T, Array[Constraint]) {
   }
 }
 
-pub fn infer_type(env : TyEnv, exp : S) -> Unit {
-  let (_, cons) = inference_constraints(env, exp)
+fn ensure_inference(exp : S) -> Unit {
+  let rec = ensure_inference
+  match exp {
+    Unit | Bool(_) | Int(_) | Double(_) | Var(_) => ()
+    Tuple(tup) => tup.each(rec)
+    Not(e) => rec(e)
+    Array(len, ele) => {
+      rec(len)
+      rec(ele)
+    }
+    Neg(e, ~kind) => {
+      rec(e)
+      if not(kind.is_known()) {
+        @util.die("Unknown type for \{exp}")
+      }
+    }
+    App(f, args) => {
+      rec(f)
+      args.each(rec)
+    }
+    Get(arr, idx) => {
+      rec(arr)
+      rec(idx)
+    }
+    If(_test, _then, _else) => {
+      rec(_test)
+      rec(_then)
+      rec(_else)
+    }
+    Prim(lhs, rhs, _, ~kind) => {
+      rec(lhs)
+      rec(rhs)
+      if not(kind.is_known()) {
+        @util.die("Unknown type for \{exp}")
+      }
+    }
+    Eq(lhs, rhs) | LE(lhs, rhs) => {
+      rec(lhs)
+      rec(rhs)
+    }
+    Let((_, ty), rhs, rest) => {
+      rec(rhs)
+      rec(rest)
+      if not(ty.is_known()) {
+        @util.die("Unknown type for \{exp}")
+      }
+    }
+    LetRec({ name: (_, ret_ty), args, body }, rest) => {
+      rec(body)
+      rec(rest)
+      if not(ret_ty.is_known()) {
+        @util.die("Unknown type for \{exp}")
+      }
+      args.each(
+        fn {
+          (_, ty) =>
+            if not(ty.is_known()) {
+              @util.die("Unknown type for \{exp}")
+            }
+        },
+      )
+    }
+    LetTuple(tup, rhs, rest) => {
+      rec(rhs)
+      rec(rest)
+      tup.each(
+        fn {
+          (_, ty) =>
+            if not(ty.is_known()) {
+              @util.die("Unknown type for \{exp}")
+            }
+        },
+      )
+    }
+    Put(lhs, rhs, rest) => {
+      rec(lhs)
+      rec(rhs)
+      rec(rest)
+    }
+  }
+}
+
+let default_env : TyEnv = @immut/sorted_map.of(
+  [
+    ("read_int", T::Fun([], T::Int)),
+    ("print_int", T::Fun([T::Int], T::Unit)),
+    ("read_char", T::Fun([], T::Int)),
+    ("print_char", T::Fun([T::Int], T::Unit)),
+    ("print_newline", T::Fun([], T::Unit)),
+    ("int_of_float", T::Fun([T::Double], T::Int)),
+    ("float_of_int", T::Fun([T::Int], T::Double)),
+    ("truncate", T::Fun([T::Double], T::Int)),
+    ("floor", T::Fun([T::Double], T::Double)),
+    ("abs_float", T::Fun([T::Double], T::Double)),
+    ("abs_float", T::Fun([T::Double], T::Double)),
+    ("sqrt", T::Fun([T::Double], T::Double)),
+    ("sin", T::Fun([T::Double], T::Double)),
+    ("cos", T::Fun([T::Double], T::Double)),
+    ("atan", T::Fun([T::Double], T::Double)),
+  ],
+)
+
+pub fn infer_type(exp : S) -> Unit {
+  let (_, cons) = inference_constraints(default_env, exp)
   unify(cons)
+  ensure_inference(exp)
 }

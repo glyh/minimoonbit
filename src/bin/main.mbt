@@ -94,7 +94,7 @@ fn CompileStatus::step(self : CompileStatus) -> Bool {
     }
     Typecheck => {
       let to_check = self.ast.unwrap().clone()
-      @typing.infer_type(@immut/sorted_map.empty(), to_check)
+      @typing.infer_type(to_check)
       self.typechecked = Some(to_check)
     }
     Knf => {
