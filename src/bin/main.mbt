@@ -282,6 +282,7 @@ fn main {
     file.unwrap()
   }
   let contents = @fs.read_to_string(file)
+  @util.die(contents)
 
   // Compilation
   let status = match
