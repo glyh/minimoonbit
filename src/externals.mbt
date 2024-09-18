@@ -4,7 +4,7 @@ pub let externals : @immut/hashmap.T[String, Type] = @immut/hashmap.of(
     ("print_int", Fun([Int], Unit)),
     ("read_char", Fun([], Int)),
     ("print_char", Fun([Int], Unit)),
-    ("print_newline", Fun([], Unit)),
+    ("print_endline", Fun([], Unit)),
     ("int_of_float", Fun([Double], Int)),
     ("float_of_int", Fun([Int], Double)),
     ("truncate", Fun([Double], Int)),

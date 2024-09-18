@@ -44,7 +44,7 @@ export fn minimbt_print_int(i: i32) void {
     std.debug.print("{d}", .{i});
 }
 
-export fn minimbt_print_newline() void {
+export fn minimbt_print_endline() void {
     std.debug.print("\n", .{});
 }
 
@@ -124,8 +124,8 @@ export fn mincaml_print_int(i: i32) void {
     minimbt_print_int(i);
 }
 
-export fn mincaml_print_newline() void {
-    minimbt_print_newline();
+export fn mincaml_print_endline() void {
+    minimbt_print_endline();
 }
 
 export fn mincaml_int_of_float(f: f64) i32 {
