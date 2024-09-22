@@ -1,3 +1,4 @@
-pub fn KnfEnv::opt_pass(self : KnfEnv, knf : Knf) -> Knf {
-  abort("todo")
+pub fn KnfEnv::opt_pass(_self : KnfEnv, knf : Knf) -> Knf {
+  // TODO: optimize
+  knf
 }

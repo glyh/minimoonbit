@@ -6,8 +6,17 @@ alias @moonbitlang/minimbt as @minimbt
 // Values
 fn knf_max_counter(Knf) -> Int
 
+fn to_knf_with_tenv(KnfEnv, @minimbt.Syntax) -> (Knf, @minimbt.Type)
+
 // Types and methods
 type DefoldPre
+
+type FVSet
+impl FVSet {
+  contains(Self, @minimbt.Name) -> Bool
+  is_empty(Self) -> Bool
+  iter(Self) -> Iter[@minimbt.Name]
+}
 
 pub struct FuncDef {
   pub name : @minimbt.Name
@@ -16,6 +25,7 @@ pub struct FuncDef {
   pub body : Knf
 }
 impl FuncDef {
+  free_variables(Self) -> FVSet
   from_json(Json) -> Self!
   op_equal(Self, Self) -> Bool
   to_json(Self) -> Json
@@ -26,7 +36,13 @@ pub enum Knf {
   Unit
   Int(Int)
   Double(Double)
+  Var(@minimbt.Name)
+  Tuple(Array[@minimbt.Name])
   Neg(@minimbt.Name)
+  Apply(@minimbt.Name, Array[@minimbt.Name])
+  Get(@minimbt.Name, @minimbt.Name)
+  IfEq(@minimbt.Name, @minimbt.Name, Knf, Knf)
+  IfLe(@minimbt.Name, @minimbt.Name, Knf, Knf)
   Add(@minimbt.Name, @minimbt.Name)
   Sub(@minimbt.Name, @minimbt.Name)
   Mul(@minimbt.Name, @minimbt.Name)
@@ -36,20 +52,15 @@ pub enum Knf {
   FSub(@minimbt.Name, @minimbt.Name)
   FMul(@minimbt.Name, @minimbt.Name)
   FDiv(@minimbt.Name, @minimbt.Name)
-  IfEq(@minimbt.Name, @minimbt.Name, Knf, Knf)
-  IfLe(@minimbt.Name, @minimbt.Name, Knf, Knf)
   Let((@minimbt.Name, @minimbt.Type), Knf, Knf)
-  Var(@minimbt.Name)
   LetRec(FuncDef, Knf)
-  Apply(@minimbt.Name, Array[@minimbt.Name])
-  Tuple(Array[@minimbt.Name])
   LetTuple(Array[(@minimbt.Name, @minimbt.Type)], @minimbt.Name, Knf)
-  Get(@minimbt.Name, @minimbt.Name)
   Put(@minimbt.Name, @minimbt.Name, @minimbt.Name)
   ExternalArray(@minimbt.Name)
   ExternalFunctionApplication(String, Array[@minimbt.Name])
 }
 impl Knf {
+  free_variables(Self) -> FVSet
   from_json(Json) -> Self!
   op_equal(Self, Self) -> Bool
   to_json(Self) -> Json
@@ -59,6 +70,8 @@ impl Knf {
 
 type KnfEnv
 impl KnfEnv {
+  add(Self, @minimbt.Name, @minimbt.Type) -> Self
+  find(Self, @minimbt.Name) -> @minimbt.Type?
   init_counter_from_existing(Self, Knf) -> Unit
   new(@hashmap.T[String, @minimbt.Type]) -> Self
   opt_pass(Self, Knf) -> Knf
@@ -66,11 +79,13 @@ impl KnfEnv {
   to_knf(Self, @minimbt.Syntax) -> Knf
 }
 
+type KnfHead
+
+type KnfHeadQ
+
 type PrettyKnf
 
 // Type aliases
-pub typealias LocalEnv = @hashmap.T[String, @minimbt.Type]
-
 pub typealias Name = @minimbt.Name
 
 pub typealias Type = @minimbt.Type

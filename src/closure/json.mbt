@@ -129,21 +129,21 @@ pub fn Expr::from_json(json : Json) -> Expr! {
 pub fn LowType::to_json(self : LowType) -> Json {
   match self {
     LowType::Unit => ["Unit"]
-    LowType::Bool => ["Bool"]
     LowType::Int => ["Int"]
-    LowType::Ptr => ["Ptr"]
+    LowType::Ptr(_) => ["Ptr"]
     LowType::Double => ["Double"]
     LowType::Tuple(ts) => ["Tuple", ts.to_json()]
     LowType::Array(t) => ["Array", t.to_json()]
-    LowType::DirectFn(ts, t) => ["DirectFunction", ts.to_json(), t.to_json()]
-    LowType::ClosureFn(ts, t) => ["ClosureFunction", ts.to_json(), t.to_json()]
+    LowType::Fn(ts, t, { val: false }) =>
+      ["DirectFunction", ts.to_json(), t.to_json()]
+    LowType::Fn(ts, t, { val: true }) =>
+      ["ClosureFunction", ts.to_json(), t.to_json()]
   }
 }
 
 pub fn LowType::from_json(json : Json) -> LowType! {
   match json {
     ["Unit"] => LowType::Unit
-    ["Bool"] => LowType::Bool
     ["Int"] => LowType::Int
     ["Double"] => LowType::Double
     ["Ptr"] => LowType::Ptr
@@ -160,14 +160,14 @@ pub fn LowType::from_json(json : Json) -> LowType! {
       for t in ts {
         ts_res.push(LowType::from_json!(t))
       }
-      LowType::DirectFn(ts_res, LowType::from_json!(t))
+      LowType::Fn(ts_res, LowType::from_json!(t), { val: false })
     }
     ["ClosureFunction", Array(ts), t] => {
       let ts_res = []
       for t in ts {
         ts_res.push(LowType::from_json!(t))
       }
-      LowType::ClosureFn(ts_res, LowType::from_json!(t))
+      LowType::Fn(ts_res, LowType::from_json!(t), { val: true })
     }
     _ => fail!("invalid json")
   }

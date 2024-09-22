@@ -15,5 +15,8 @@ pub let externals : @immut/hashmap.T[String, Type] = @immut/hashmap.of(
     ("sin", Fun([Double], Double)),
     ("cos", Fun([Double], Double)),
     ("atan", Fun([Double], Double)),
+    ("create_array", Fun([Int], Array(Int))),
+    ("create_float_array", Fun([Int], Array(Double))),
+    ("create_ptr_array", Fun([Int], Array(Ptr))),
   ],
 )

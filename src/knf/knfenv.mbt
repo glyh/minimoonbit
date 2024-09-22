@@ -2,7 +2,7 @@ struct KnfEnv {
   mut counter : Int
   init_externals_name : @hashset.T[String]
   externals : @immut/hashmap.T[String, T]
-  externals_slotted : @immut/hashmap.T[Name, T]
+  nonexternals : @immut/hashmap.T[Name, T]
 }
 
 pub fn KnfEnv::new(externals : @immut/hashmap.T[String, T]) -> KnfEnv {
@@ -11,7 +11,7 @@ pub fn KnfEnv::new(externals : @immut/hashmap.T[String, T]) -> KnfEnv {
   {
     counter: 1,
     externals,
-    externals_slotted: @immut/hashmap.new(),
+    nonexternals: @immut/hashmap.new(),
     init_externals_name: externals.iter().map(fn { (k, _) => k })
     |> @hashset.from_iter(),
   }
@@ -21,14 +21,21 @@ pub fn KnfEnv::add(self : KnfEnv, name : Name, ty : T) -> KnfEnv {
   match name {
     { slot: 0, name: Some(name) } =>
       { ..self, externals: self.externals.add(name, ty) }
-    name => { ..self, externals_slotted: self.externals_slotted.add(name, ty) }
+    name => { ..self, nonexternals: self.nonexternals.add(name, ty) }
+  }
+}
+
+pub fn KnfEnv::has_external(self : KnfEnv, name : String) -> Bool {
+  match self.externals.find(name) {
+    Some(_) => true
+    _ => false
   }
 }
 
 pub fn KnfEnv::find(self : KnfEnv, name : Name) -> T? {
   match name {
     { slot: 0, name: Some(name) } => self.externals.find(name)
-    name => self.externals_slotted.find(name)
+    name => self.nonexternals.find(name)
   }
 }
 

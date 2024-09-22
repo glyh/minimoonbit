@@ -28,7 +28,8 @@ fn Stages::next(self : Stages) -> Stages {
     Stages::Typecheck => Stages::Knf
     Stages::Knf => Stages::KnfOpt
     Stages::KnfOpt => Stages::Closure
-    Stages::Closure => @util.die("TODO")
+    Stages::Closure => // TODO
+      Stages::Asm
     Stages::Asm => Stages::Finished
     Stages::Finished => Stages::Finished
   }
@@ -143,7 +144,7 @@ fn CompileStatus::output(self : CompileStatus, json : Bool) -> String {
       Knf => self.typechecked.unwrap().to_string()
       KnfOpt => self.knf.unwrap().to_string()
       Closure => self.opt_knf.unwrap().to_string()
-      Asm => @util.die("TODO")
+      Asm => self.closure_ir.unwrap().to_string()
       Finished => @riscv.print_functions(self.asm.unwrap())
     }
   }

@@ -7,6 +7,11 @@ alias @moonbitlang/minimbt/knf as @knf
 fn knf_program_to_closure(@knf.Knf, Map[String, @minimbt.Type]) -> Program
 
 // Types and methods
+type CloEnv
+impl CloEnv {
+  to_string(Self) -> String
+}
+
 pub struct Closure {
   pub name : Label
   pub actual_free_vars : Array[@minimbt.Name]
@@ -21,7 +26,14 @@ pub enum Expr {
   Unit
   Int(Int)
   Double(Double)
+  Var(@minimbt.Name)
+  MakeTuple(Array[@minimbt.Name])
   Neg(@minimbt.Name)
+  CallClosure(@minimbt.Name, Array[@minimbt.Name])
+  CallDirect(Label, Array[@minimbt.Name])
+  ArrayGet(@minimbt.Name, @minimbt.Name)
+  IfEq(@minimbt.Name, @minimbt.Name, Expr, Expr)
+  IfLe(@minimbt.Name, @minimbt.Name, Expr, Expr)
   Add(@minimbt.Name, @minimbt.Name)
   Sub(@minimbt.Name, @minimbt.Name)
   Mul(@minimbt.Name, @minimbt.Name)
@@ -31,16 +43,9 @@ pub enum Expr {
   FSub(@minimbt.Name, @minimbt.Name)
   FMul(@minimbt.Name, @minimbt.Name)
   FDiv(@minimbt.Name, @minimbt.Name)
-  IfEq(@minimbt.Name, @minimbt.Name, Expr, Expr)
-  IfLe(@minimbt.Name, @minimbt.Name, Expr, Expr)
   Let((@minimbt.Name, LowType), Expr, Expr)
-  Var(@minimbt.Name)
   MakeClosure((@minimbt.Name, LowType), Closure, Expr)
-  CallClosure(@minimbt.Name, Array[@minimbt.Name])
-  CallDirect(Label, Array[@minimbt.Name])
-  MakeTuple(Array[@minimbt.Name])
   LetTuple(Array[(@minimbt.Name, LowType)], @minimbt.Name, Expr)
-  ArrayGet(@minimbt.Name, @minimbt.Name)
   ArrayPut(@minimbt.Name, @minimbt.Name, @minimbt.Name)
   ExternalArray(Label)
 }
@@ -67,16 +72,18 @@ impl FuncDef {
 
 pub type Label String
 impl Label {
+  hash_combine(Self, Hasher) -> Unit
+  op_equal(Self, Self) -> Bool
   to_string(Self) -> String
 }
 
+type LetHead
+
 pub enum LowType {
   Unit
-  Bool
   Int
   Double
-  ClosureFn(Array[LowType], LowType)
-  DirectFn(Array[LowType], LowType)
+  Fn(Array[LowType], LowType, Ref[Bool])
   Tuple(Array[LowType])
   Array(LowType)
   Ptr
@@ -85,9 +92,13 @@ impl LowType {
   from_json(Json) -> Self!
   is_float_like(Self) -> Bool
   is_ptr_like(Self) -> Bool
+  mark_as_closure(Self) -> Unit
+  of_ty(@minimbt.Type) -> Self
+  op_equal(Self, Self) -> Bool
   size_of(Self, Int) -> Int
   to_json(Self) -> Json
   to_string(Self) -> String
+  unify_clo(Self, Self) -> Unit
 }
 
 pub struct Program {
@@ -101,8 +112,6 @@ impl Program {
 }
 
 // Type aliases
-pub typealias LocalEnv = @moonbitlang/core/immut/hashmap.T[@minimbt.Name, LowType]
-
 pub typealias Name = @minimbt.Name
 
 pub typealias Type = @minimbt.Type
@@ -110,6 +119,8 @@ pub typealias Type = @minimbt.Type
 // Traits
 
 // Extension Methods
+impl Show for CloEnv
+
 impl Show for Closure
 
 impl Show for Expr

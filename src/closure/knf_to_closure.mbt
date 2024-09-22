@@ -1,8 +1,9 @@
-pub typealias LocalEnv = @immut/hashmap.T[Name, LowType]
-
 pub fn knf_program_to_closure(
-  _prog : @knf.Knf,
-  _extern_env : Map[String, Type]
+  k : K,
+  external_env : Map[String, Type]
 ) -> Program {
-  abort("todo")
+  let env = CloEnv::new(external_env, k)
+  let body = env.collect_closure(k)
+  let fundefs = env.fundefs.iter().map(fn { (_, v) => v }).collect()
+  { fundefs, body }
 }

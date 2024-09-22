@@ -4,7 +4,7 @@ alias @moonbitlang/core/immut/sorted_set as @sorted_set
 alias @moonbitlang/minimbt as @minimbt
 
 // Values
-fn infer_type(@minimbt.Syntax) -> Unit
+fn infer_type(@minimbt.Syntax) -> @minimbt.Syntax
 
 // Types and methods
 type TVarSet

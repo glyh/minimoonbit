@@ -1,11 +1,14 @@
 package moonbitlang/minimbt
 
+alias @moonbitlang/core/immut/hashmap as @hashmap
 alias @moonbitlang/core/immut/sorted_set as @sorted_set
 
 // Values
 fn classed_tvar(FixedArray[TClass]) -> Type
 
 fn dummy_tvar() -> Type
+
+let externals : @hashmap.T[String, Type]
 
 // Types and methods
 pub struct Fundef {

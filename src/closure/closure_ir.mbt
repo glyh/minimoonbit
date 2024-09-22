@@ -1,5 +1,3 @@
-pub type Label String derive(Show)
-
 pub typealias Name = @types.Name
 
 pub typealias Type = @types.Type
@@ -8,7 +6,14 @@ pub enum Expr {
   Unit
   Int(Int)
   Double(Double)
+  Var(Name)
+  MakeTuple(Array[Name])
   Neg(Name)
+  CallClosure(Name, Array[Name])
+  CallDirect(Label, Array[Name])
+  ArrayGet(Name, Name)
+  IfEq(Name, Name, Expr, Expr)
+  IfLe(Name, Name, Expr, Expr)
   Add(Name, Name)
   Sub(Name, Name)
   Mul(Name, Name)
@@ -18,16 +23,9 @@ pub enum Expr {
   FSub(Name, Name)
   FMul(Name, Name)
   FDiv(Name, Name)
-  IfEq(Name, Name, Expr, Expr)
-  IfLe(Name, Name, Expr, Expr)
   Let((Name, LowType), Expr, Expr)
-  Var(Name)
   MakeClosure((Name, LowType), Closure, Expr)
-  CallClosure(Name, Array[Name])
-  CallDirect(Label, Array[Name])
-  MakeTuple(Array[Name])
   LetTuple(Array[(Name, LowType)], Name, Expr)
-  ArrayGet(Name, Name)
   ArrayPut(Name, Name, Name)
   ExternalArray(Label)
 } derive(Show)
@@ -46,7 +44,7 @@ pub struct FuncDef {
   ty : LowType
   args : Array[(Name, LowType)]
   formal_free_vars : Array[(Name, LowType)]
-  body : Expr
+  mut body : Expr
 } derive(Show)
 
 pub struct Program {
