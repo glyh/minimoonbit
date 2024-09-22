@@ -13,3 +13,8 @@ fn zip2[A, B](arr1 : Array[A], arr2 : Array[B]) -> Array[(A, B)] {
     _ => @util.die("zipping arrays of different size")
   }
 }
+
+enum Either[A, B] {
+  Left(A)
+  Right(B)
+} derive(Show)

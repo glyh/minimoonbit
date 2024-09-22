@@ -5,11 +5,6 @@
 
 pub type Label String derive(Show, Hash, Eq)
 
-enum Either[A, B] {
-  Left(A)
-  Right(B)
-} derive(Show)
-
 struct CloEnv {
   // NOTE: we only want fundefs to contaminate as it's at top-level
   fundefs : @hashmap.T[Label, FuncDef]
