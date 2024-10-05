@@ -2,9 +2,11 @@
 enum Stages {
   Parse
   Typecheck
-  Knf
-  KnfOpt
-  Closure
+  PreCps
+  Cps
+  //Knf
+  //KnfOpt
+  //Closure
   Asm
   Finished
 } derive(Show, Eq, Compare)
@@ -13,9 +15,11 @@ fn Stages::from_string(s : String) -> Stages? {
   match s {
     "parse" => Some(Stages::Parse)
     "typecheck" => Some(Stages::Typecheck)
-    "knf" => Some(Stages::Knf)
-    "knf-opt" => Some(Stages::KnfOpt)
-    "closure" => Some(Stages::Closure)
+    "precps" => Some(Stages::PreCps)
+    "cps" => Some(Stages::Cps)
+    //"knf" => Some(Stages::Knf)
+    //"knf-opt" => Some(Stages::KnfOpt)
+    //"closure" => Some(Stages::Closure)
     "riscv" => Some(Stages::Asm)
     "finished" => Some(Stages::Finished)
     _ => None
@@ -25,11 +29,9 @@ fn Stages::from_string(s : String) -> Stages? {
 fn Stages::next(self : Stages) -> Stages {
   match self {
     Stages::Parse => Stages::Typecheck
-    Stages::Typecheck => Stages::Knf
-    Stages::Knf => Stages::KnfOpt
-    Stages::KnfOpt => Stages::Closure
-    Stages::Closure => // TODO
-      Stages::Asm
+    Stages::Typecheck => Stages::PreCps
+    Stages::PreCps => Stages::Cps
+    Stages::Cps => Stages::Asm
     Stages::Asm => Stages::Finished
     Stages::Finished => Stages::Finished
   }
@@ -41,10 +43,13 @@ struct CompileStatus {
   mut source_code : String?
   mut ast : @types.Syntax?
   mut typechecked : @types.Syntax?
-  knf_env : @knf.KnfEnv
-  mut knf : @knf.Knf?
-  mut opt_knf : @knf.Knf?
-  mut closure_ir : @closure.Program?
+  mut precps : @precps.PreCps?
+  mut precpsenv : @precps.TyEnv?
+  mut cps : @cps.Cps?
+  //knf_env : @knf.KnfEnv
+  //mut knf : @knf.Knf?
+  //mut opt_knf : @knf.Knf?
+  //mut closure_ir : @closure.Program?
   mut asm : Array[@riscv.AssemblyFunction]?
 }
 
@@ -59,24 +64,28 @@ fn CompileStatus::initialize(
     source_code: None,
     ast: None,
     typechecked: None,
-    knf_env: @knf.KnfEnv::new(@types.externals),
-    knf: None,
-    opt_knf: None,
-    closure_ir: None,
+    precps: None,
+    precpsenv: None,
+    cps: None,
+    //knf_env: @knf.KnfEnv::new(@types.externals),
+    //knf: None,
+    //opt_knf: None,
+    //closure_ir: None,
     asm: None,
   }
   match start_stage {
     Parse => v.source_code = Some(file)
     Typecheck => v.ast = Some(@types.Syntax::from_json!(@json.parse!(file)))
-    Knf => v.typechecked = Some(@types.Syntax::from_json!(@json.parse!(file)))
-    KnfOpt => {
-      v.knf = Some(@knf.Knf::from_json!(@json.parse!(file)))
-      v.knf_env.init_counter_from_existing(v.knf.unwrap())
-    }
-    Closure => {
-      v.opt_knf = Some(@knf.Knf::from_json!(@json.parse!(file)))
-      v.knf_env.init_counter_from_existing(v.opt_knf.unwrap())
-    }
+    PreCps =>
+      v.typechecked = Some(@types.Syntax::from_json!(@json.parse!(file)))
+    //KnfOpt => {
+    //  v.knf = Some(@knf.Knf::from_json!(@json.parse!(file)))
+    //  v.knf_env.init_counter_from_existing(v.knf.unwrap())
+    //}
+    //Closure => {
+    //  v.opt_knf = Some(@knf.Knf::from_json!(@json.parse!(file)))
+    //  v.knf_env.init_counter_from_existing(v.opt_knf.unwrap())
+    //}
     _ => fail!("invalid start stage")
   }
   v
@@ -97,27 +106,39 @@ fn CompileStatus::step(self : CompileStatus) -> Bool {
       let to_check = self.ast.unwrap().clone()
       self.typechecked = Some(@typing.infer_type(to_check))
     }
-    Knf => {
-      let preprocessed = self.knf_env.syntax_preprocess(
-        self.typechecked.unwrap(),
-      )
-      let knf = self.knf_env.to_knf(preprocessed)
-      self.knf = Some(knf)
+    PreCps => {
+      let tyenv = @precps.TyEnv::new(@types.externals)
+      let entry_inlined = @precps.inline_entry(self.typechecked.unwrap())
+      self.precps = Some(tyenv.ast2precps(entry_inlined))
+      self.precpsenv = Some(tyenv)
     }
-    KnfOpt => {
-      let knf = self.knf.unwrap()
-      // TODO: optimize
-      self.opt_knf = Some(knf)
+    Cps => {
+      let cpsenv = @cps.CpsEnv::new(self.precpsenv.unwrap().counter.val)
+      let mut cps = cpsenv.precps2cps(self.precps.unwrap(), @cps.Cps::Just)
+      cps = @cps.alias_analysis(cps)
+      self.cps = Some(cps)
     }
-    Closure => {
-      let closure_ir = @closure.knf_program_to_closure(
-        self.opt_knf.unwrap(),
-        Map::from_iter(@types.externals.iter()),
-      )
-      self.closure_ir = Some(closure_ir)
-    }
+    //Knf => {
+    //  let preprocessed = self.knf_env.syntax_preprocess(
+    //    self.typechecked.unwrap(),
+    //  )
+    //  let knf = self.knf_env.to_knf(preprocessed)
+    //  self.knf = Some(knf)
+    //}
+    //KnfOpt => {
+    //  let knf = self.knf.unwrap()
+    //  // TODO: optimize
+    //  self.opt_knf = Some(knf)
+    //}
+    //Closure => {
+    //  let closure_ir = @closure.knf_program_to_closure(
+    //    self.opt_knf.unwrap(),
+    //    Map::from_iter(@types.externals.iter()),
+    //  )
+    //  self.closure_ir = Some(closure_ir)
+    //}
     Asm => {
-      let real_asm = @riscv.emit(@util.die("TODO"))
+      let real_asm = @riscv.emit(@util.die("TODO5"))
       self.asm = Some(real_asm)
     }
     Finished => ()
@@ -131,20 +152,25 @@ fn CompileStatus::output(self : CompileStatus, json : Bool) -> String {
     match self.curr_stage {
       Parse => self.source_code.unwrap()
       Typecheck => @json.stringify(self.ast.unwrap().to_json())
-      Knf => @json.stringify(self.typechecked.unwrap().to_json())
-      KnfOpt => @json.stringify(self.knf.unwrap().to_json())
-      Closure => @json.stringify(self.opt_knf.unwrap().to_json())
-      Asm => @util.die("TODO")
+      PreCps => @util.die("TODO1")
+      Cps => @util.die("TODO2")
+      //Knf => @json.stringify(self.typechecked.unwrap().to_json())
+      //KnfOpt => @json.stringify(self.knf.unwrap().to_json())
+      //Closure => @json.stringify(self.opt_knf.unwrap().to_json())
+      Asm => @util.die("TODO3")
       Finished => @riscv.print_functions(self.asm.unwrap())
     }
   } else {
     match self.curr_stage {
       Parse => self.source_code.unwrap()
       Typecheck => self.ast.unwrap().to_string()
-      Knf => self.typechecked.unwrap().to_string()
-      KnfOpt => self.knf.unwrap().to_string()
-      Closure => self.opt_knf.unwrap().to_string()
-      Asm => self.closure_ir.unwrap().to_string()
+      PreCps => self.typechecked.unwrap().to_string()
+      Cps => self.precps.unwrap().to_string()
+      //Knf => self.typechecked.unwrap().to_string()
+      //KnfOpt => self.knf.unwrap().to_string()
+      //Closure => self.opt_knf.unwrap().to_string()
+      Asm => self.cps.unwrap().to_string()
+      //self.closure_ir.unwrap().to_string()
       Finished => @riscv.print_functions(self.asm.unwrap())
     }
   }
@@ -261,12 +287,12 @@ fn main {
   )
 
   // Configure pipeline
-  if knf_interpreter.val {
-    end_stage.val = Stages::Knf
-  }
-  if closure_interpreter.val {
-    end_stage.val = Stages::Closure
-  }
+  //if knf_interpreter.val {
+  //  end_stage.val = Stages::Knf
+  //}
+  //if closure_interpreter.val {
+  //  end_stage.val = Stages::Closure
+  //}
   let stages_to_print = print.val.map(
     fn(s) {
       match Stages::from_string(s) {
@@ -309,32 +335,32 @@ fn main {
   }
 
   // Output
-  if knf_interpreter.val {
-    let knfi = @knf_eval.KnfInterpreter::new()
-    add_interpreter_fns(knfi)
-    match knfi.eval_full?(status.knf.unwrap()) {
-      Ok(_) => ()
-      Err(Failure(e)) => {
-        println(e)
-        @util.die("KNF interpreter error")
-      }
-    }
-  } else if closure_interpreter.val {
-    let clsi = @closure_eval.ClosureInterpreter::new()
-    add_closure_interpreter_fns(clsi)
-    match clsi.eval_full?(status.closure_ir.unwrap()) {
-      Ok(_) => ()
-      Err(Failure(e)) => {
-        println(e)
-        @util.die("Closure interpreter error")
-      }
-    }
+  //if knf_interpreter.val {
+  //  let knfi = @knf_eval.KnfInterpreter::new()
+  //  add_interpreter_fns(knfi)
+  //  match knfi.eval_full?(status.knf.unwrap()) {
+  //    Ok(_) => ()
+  //    Err(Failure(e)) => {
+  //      println(e)
+  //      @util.die("KNF interpreter error")
+  //    }
+  //  }
+  //} else if closure_interpreter.val {
+  //  let clsi = @closure_eval.ClosureInterpreter::new()
+  //  add_closure_interpreter_fns(clsi)
+  //  match clsi.eval_full?(status.closure_ir.unwrap()) {
+  //    Ok(_) => ()
+  //    Err(Failure(e)) => {
+  //      println(e)
+  //      @util.die("Closure interpreter error")
+  //    }
+  //  }
+  //} else {
+  let out_string = status.output(json.val)
+  if out_file.val == "-" {
+    println(out_string)
   } else {
-    let out_string = status.output(json.val)
-    if out_file.val == "-" {
-      println(out_string)
-    } else {
-      @fs.write_to_string(out_file.val, out_string)
-    }
+    @fs.write_to_string(out_file.val, out_string)
   }
+  //}
 }

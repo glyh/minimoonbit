@@ -17,7 +17,7 @@ pub enum Syntax {
   Let((String, Type), Syntax, Syntax) // let _: _ = _; _
   LetRec(Fundef, Syntax) // fn f() {} ; _
   LetTuple(Array[(String, Type)], Syntax, Syntax) // let (_ , _) : (_, _)= _; _
-  Put(Syntax, Syntax, Syntax) // lhs = rhs; rest
+  Put(Syntax, Syntax, Syntax) // _[_] = _
 } derive(Show)
 
 pub enum Op {
@@ -28,7 +28,7 @@ pub enum Op {
 } derive(Show, Eq)
 
 pub struct Fundef {
-  name : (String, Type)
+  name : (String, Type) // the Type stores the function type rather than the returned type
   args : Array[(String, Type)]
   body : Syntax
 } derive(Show)

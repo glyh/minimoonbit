@@ -10,6 +10,8 @@
       "path": "moonbitlang/minimbt",
       "alias": "types"
     },
+    "moonbitlang/minimbt/precps",
+    "moonbitlang/minimbt/cps",
     "moonbitlang/minimbt/knf",
     "moonbitlang/minimbt/typing",
     "moonbitlang/minimbt/knf_eval",

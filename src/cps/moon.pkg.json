@@ -1,0 +1,15 @@
+{
+  "import": [
+    {
+      "path": "moonbitlang/minimbt",
+      "alias": "top"
+    },
+    "moonbitlang/minimbt/util",
+    "moonbitlang/minimbt/precps"
+  ],
+  "test-import": [
+    "moonbitlang/minimbt/parser",
+    "moonbitlang/minimbt/lex",
+    "moonbitlang/minimbt/typing"
+  ]
+}
