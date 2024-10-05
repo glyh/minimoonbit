@@ -48,7 +48,7 @@ pub fn TyEnv::find(self : TyEnv, name : String) -> PreCps? {
   match self.bindings[Right(name)] {
     Some(item) => Some(Var(item.1, item.0))
     None =>
-      match self.bindings[Right("minimbt_" + name)] {
+      match self.bindings[Right(name)] {
         None => None
         Some(item) => Some(Var(item.1, item.0))
       }

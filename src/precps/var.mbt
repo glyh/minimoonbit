@@ -15,5 +15,5 @@ pub fn Var::to_string(self : Var) -> String {
 }
 
 pub fn Var::var_of_external(ext_name : String) -> Var {
-  { name: Some("minimbt_" + ext_name), id: -1 }
+  { name: Some(ext_name), id: -1 }
 }
