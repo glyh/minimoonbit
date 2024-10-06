@@ -13,6 +13,7 @@ pub enum PreCps {
   Let(T, Var, PreCps, PreCps)
   // T marks return type
   Var(T, Var)
+  Label(T, Var)
   Tuple(T, Array[PreCps])
   Prim(T, PrimOp, Array[PreCps])
   KthTuple(T, Int, PreCps)
@@ -33,6 +34,7 @@ pub fn PreCps::to_string(self : PreCps) -> String {
       "letrec \{name}(\{args}){\{body}} in \{rest}"
     Let(_, name, rhs, rest) => "let \{name} = \{rhs} in \{rest}"
     Var(_, v) => v.to_string()
+    Label(_, v) => ":" + v.to_string()
     Tuple(_, tup) => tup.to_string()
     KthTuple(_, idx, tup) => "(\{tup}).\{idx}"
     App(_, f, args) => "(\{f} \{args})"
@@ -50,6 +52,7 @@ pub fn PreCps::get_type(self : PreCps) -> T {
     LetRec(_, _, _, _, inner) => inner.get_type()
     Let(_, _, _, inner) => inner.get_type()
     Var(t, _)
+    | Label(t, _)
     | Tuple(t, _)
     | Prim(t, _, _) | KthTuple(t, _, _) | App(t, _, _) | If(t, _, _, _) => t
   }

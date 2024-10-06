@@ -11,6 +11,7 @@
       "alias": "types"
     },
     "moonbitlang/minimbt/precps",
+    "moonbitlang/minimbt/closureps",
     "moonbitlang/minimbt/cps",
     "moonbitlang/minimbt/knf",
     "moonbitlang/minimbt/typing",

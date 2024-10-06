@@ -53,7 +53,7 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
         new_vars.push(var)
       }
       // create the wrapper
-      let k_ref = self.new_tmp(k_type)
+      let k_ref = self.new_named("kont_\{fn_name}", k_type)
       new_vars.push(k_ref)
       let f_ref = Var::from_precps(fn_name, new_f_type)
       fn fn_cont(returned : Value) {
@@ -82,11 +82,12 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
       Fix(k_ref, [x_ref], c(Var(x_ref)), self.precps2cps(f, c1))
     }
     Var(ty, v) => c(Var(Var::from_precps(v, ty)))
+    Label(ty, v) => c(Label(Var::from_precps(v, ty)))
     Tuple(tup_ty, elements) => {
       fn c1(vs : @immut/list.T[Value]) {
         let tmp = self.new_tmp(tup_ty)
-        let record_inner = vs.iter().map(fn { v => (v, OffP(0)) }).collect()
-        Record(record_inner, tmp, c(Var(tmp)))
+        let record_inner = vs.iter().collect()
+        Tuple(record_inner, tmp, c(Var(tmp)))
       }
 
       self.precps2cps_list(elements, c1)
@@ -102,7 +103,7 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
     KthTuple(ret_ty, offset, tup) => {
       fn c1(v : Value) {
         let tmp = self.new_tmp(ret_ty)
-        Select(offset, v, tmp, c(Var(tmp)))
+        KthTuple(offset, v, tmp, c(Var(tmp)))
       }
 
       self.precps2cps(tup, c1)

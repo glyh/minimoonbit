@@ -1,4 +1,4 @@
-impl Show for Var with output(self, logger) {
+pub impl Show for Var with output(self, logger) {
   logger.write_string(self.to_string())
 }
 
@@ -9,7 +9,7 @@ pub fn Var::to_string(self : Var) -> String {
   }
 }
 
-impl Show for Value with output(self, logger) {
+pub impl Show for Value with output(self, logger) {
   logger.write_string(self.to_string())
 }
 
@@ -37,9 +37,9 @@ fn to_str(cps : Cps, ~ident : String = "") -> String {
   }
 
   match cps {
-    Record(arr, bind, rest) => ident + "\{bind} = \{arr}\n" + rec(rest)
-    Select(idx, v, bind, rest) => ident + "\{bind} = \{v}[\{idx}]\n" + rec(rest)
-    Offset(idx, v, bind, rest) => ident + "\{bind} = \{v}+\{idx}\n" + rec(rest)
+    Tuple(arr, bind, rest) => ident + "\{bind} = \{arr}\n" + rec(rest)
+    KthTuple(idx, v, bind, rest) =>
+      ident + "\{bind} = \{v}.\{idx}\n" + rec(rest)
     Fix(name, args, body, rest) =>
       ident +
       "fn \{name}(\{args}) {\n" +

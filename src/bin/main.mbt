@@ -4,9 +4,8 @@ enum Stages {
   Typecheck
   PreCps
   Cps
-  //Knf
-  //KnfOpt
-  //Closure
+  CloPS
+  // NOTE: add stages here.
   Asm
   Finished
 } derive(Show, Eq, Compare)
@@ -17,9 +16,8 @@ fn Stages::from_string(s : String) -> Stages? {
     "typecheck" => Some(Stages::Typecheck)
     "precps" => Some(Stages::PreCps)
     "cps" => Some(Stages::Cps)
-    //"knf" => Some(Stages::Knf)
-    //"knf-opt" => Some(Stages::KnfOpt)
-    //"closure" => Some(Stages::Closure)
+    "clops" => Some(Stages::CloPS)
+    // NOTE: add stages here.
     "riscv" => Some(Stages::Asm)
     "finished" => Some(Stages::Finished)
     _ => None
@@ -31,7 +29,9 @@ fn Stages::next(self : Stages) -> Stages {
     Stages::Parse => Stages::Typecheck
     Stages::Typecheck => Stages::PreCps
     Stages::PreCps => Stages::Cps
-    Stages::Cps => Stages::Asm
+    Stages::Cps => Stages::CloPS
+    Stages::CloPS => Stages::Asm
+    // NOTE: add stages here.
     Stages::Asm => Stages::Finished
     Stages::Finished => Stages::Finished
   }
@@ -43,13 +43,11 @@ struct CompileStatus {
   mut source_code : String?
   mut ast : @types.Syntax?
   mut typechecked : @types.Syntax?
+  mut counter : Int // for unique var generation
   mut precps : @precps.PreCps?
-  mut precpsenv : @precps.TyEnv?
   mut cps : @cps.Cps?
-  //knf_env : @knf.KnfEnv
-  //mut knf : @knf.Knf?
-  //mut opt_knf : @knf.Knf?
-  //mut closure_ir : @closure.Program?
+  mut clops : @closureps.ClosurePS?
+  // NOTE: add stages here.
   mut asm : Array[@riscv.AssemblyFunction]?
 }
 
@@ -64,13 +62,11 @@ fn CompileStatus::initialize(
     source_code: None,
     ast: None,
     typechecked: None,
+    counter: 0,
     precps: None,
-    precpsenv: None,
     cps: None,
-    //knf_env: @knf.KnfEnv::new(@types.externals),
-    //knf: None,
-    //opt_knf: None,
-    //closure_ir: None,
+    clops: None,
+    // NOTE: add stages here.
     asm: None,
   }
   match start_stage {
@@ -78,14 +74,6 @@ fn CompileStatus::initialize(
     Typecheck => v.ast = Some(@types.Syntax::from_json!(@json.parse!(file)))
     PreCps =>
       v.typechecked = Some(@types.Syntax::from_json!(@json.parse!(file)))
-    //KnfOpt => {
-    //  v.knf = Some(@knf.Knf::from_json!(@json.parse!(file)))
-    //  v.knf_env.init_counter_from_existing(v.knf.unwrap())
-    //}
-    //Closure => {
-    //  v.opt_knf = Some(@knf.Knf::from_json!(@json.parse!(file)))
-    //  v.knf_env.init_counter_from_existing(v.opt_knf.unwrap())
-    //}
     _ => fail!("invalid start stage")
   }
   v
@@ -110,33 +98,21 @@ fn CompileStatus::step(self : CompileStatus) -> Bool {
       let tyenv = @precps.TyEnv::new(@types.externals)
       let entry_inlined = @precps.inline_entry(self.typechecked.unwrap())
       self.precps = Some(tyenv.ast2precps(entry_inlined))
-      self.precpsenv = Some(tyenv)
+      self.counter = tyenv.counter.val
     }
     Cps => {
-      let cpsenv = @cps.CpsEnv::new(self.precpsenv.unwrap().counter.val)
+      let cpsenv = @cps.CpsEnv::new(self.counter)
       let mut cps = cpsenv.precps2cps(self.precps.unwrap(), @cps.Cps::Just)
       cps = @cps.alias_analysis(cps)
       self.cps = Some(cps)
+      self.counter = cpsenv.counter.val
     }
-    //Knf => {
-    //  let preprocessed = self.knf_env.syntax_preprocess(
-    //    self.typechecked.unwrap(),
-    //  )
-    //  let knf = self.knf_env.to_knf(preprocessed)
-    //  self.knf = Some(knf)
-    //}
-    //KnfOpt => {
-    //  let knf = self.knf.unwrap()
-    //  // TODO: optimize
-    //  self.opt_knf = Some(knf)
-    //}
-    //Closure => {
-    //  let closure_ir = @closure.knf_program_to_closure(
-    //    self.opt_knf.unwrap(),
-    //    Map::from_iter(@types.externals.iter()),
-    //  )
-    //  self.closure_ir = Some(closure_ir)
-    //}
+    CloPS => {
+      let clops = @closureps.cps2clops(self.counter, self.cps.unwrap())
+      self.clops = Some(clops)
+      self.counter = clops.counter.val
+    }
+    // NOTE: add stages here.
     Asm => {
       let real_asm = @riscv.emit(@util.die("TODO5"))
       self.asm = Some(real_asm)
@@ -154,9 +130,8 @@ fn CompileStatus::output(self : CompileStatus, json : Bool) -> String {
       Typecheck => @json.stringify(self.ast.unwrap().to_json())
       PreCps => @util.die("TODO1")
       Cps => @util.die("TODO2")
-      //Knf => @json.stringify(self.typechecked.unwrap().to_json())
-      //KnfOpt => @json.stringify(self.knf.unwrap().to_json())
-      //Closure => @json.stringify(self.opt_knf.unwrap().to_json())
+      CloPS => @util.die("TODO999")
+      // NOTE: add stages here.
       Asm => @util.die("TODO3")
       Finished => @riscv.print_functions(self.asm.unwrap())
     }
@@ -166,11 +141,9 @@ fn CompileStatus::output(self : CompileStatus, json : Bool) -> String {
       Typecheck => self.ast.unwrap().to_string()
       PreCps => self.typechecked.unwrap().to_string()
       Cps => self.precps.unwrap().to_string()
-      //Knf => self.typechecked.unwrap().to_string()
-      //KnfOpt => self.knf.unwrap().to_string()
-      //Closure => self.opt_knf.unwrap().to_string()
-      Asm => self.cps.unwrap().to_string()
-      //self.closure_ir.unwrap().to_string()
+      CloPS => self.cps.unwrap().to_string()
+      // NOTE: add stages here.
+      Asm => self.clops.unwrap().to_string()
       Finished => @riscv.print_functions(self.asm.unwrap())
     }
   }

@@ -1,9 +1,8 @@
 pub fn alias_analysis(c : Cps) -> Cps {
   let rec = alias_analysis
   match c {
-    Record(arr, bind, inner) => Record(arr, bind, rec(inner))
-    Select(idx, v, bind, inner) => Select(idx, v, bind, rec(inner))
-    Offset(idx, v, bind, inner) => Offset(idx, v, bind, rec(inner))
+    Tuple(arr, bind, inner) => Tuple(arr, bind, rec(inner))
+    KthTuple(idx, v, bind, inner) => KthTuple(idx, v, bind, rec(inner))
     Fix(f1, args1, App(f2, args2), rest) => {
       let args1_fix = args1.map(fn { v => Var(v) })
       if args1_fix == args2 {
