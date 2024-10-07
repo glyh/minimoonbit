@@ -8,10 +8,10 @@ pub fn CpsEnv::new(counter : Int) -> CpsEnv {
 
 fn CpsEnv::new_tmp(self : CpsEnv, t : T) -> Var {
   self.counter.val = self.counter.val + 1
-  { name: { val: None }, id: self.counter.val, ty: t }
+  { name: { val: None }, id: self.counter.val, ty: { val: t } }
 }
 
 fn CpsEnv::new_named(self : CpsEnv, s : String, t : T) -> Var {
   self.counter.val = self.counter.val + 1
-  { name: { val: Some(s) }, id: self.counter.val, ty: t }
+  { name: { val: Some(s) }, id: self.counter.val, ty: { val: t } }
 }

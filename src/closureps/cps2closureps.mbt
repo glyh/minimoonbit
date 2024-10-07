@@ -61,8 +61,8 @@ fn CloEnv::collect_closure(self : CloEnv, s : S) -> S {
 
       // Step 3. Rewrap the body on demand
       if has_free_vars {
-        let fn_ptr = self.new_named("fn_ptr", f.ty)
-        let fv_data_ty = T::Tuple(free_vars.map(fn { v => v.ty }))
+        let fn_ptr = self.new_named("fn_ptr", f.ty.val)
+        let fv_data_ty = T::Tuple(free_vars.map(fn { v => v.ty.val }))
         let freevars = self.new_named("fvs", fv_data_ty)
         body = free_vars.foldi(
           init=body,
@@ -77,26 +77,32 @@ fn CloEnv::collect_closure(self : CloEnv, s : S) -> S {
       }
 
       // Step 4. Patching f's args and types
-      guard let T::Fun(_args_ty, ret_ty) = f.ty else {
+      let fn_ptr_ty = f.ty.val
+      let fv_data_ty = if has_free_vars {
+        T::Tuple(free_vars.map(fn { v => v.ty.val }))
+      } else {
+        Unit
+      }
+      closure_ref.ty.val = T::Tuple([fn_ptr_ty, fv_data_ty])
+      guard let T::Fun(_args_ty, ret_ty) = f.ty.val else {
         _ => @util.die("calling non function")
         // NOTE: the following alters f's type 
       }
       let args_ty = _args_ty.copy()
-      args_ty.push(closure_ref.ty) // WARN: types are self-recursive now
-      let f = f.retype(Fun(args_ty, ret_ty))
+      args_ty.push(closure_ref.ty.val) // WARN: types are self-recursive now
+      f.ty.val = Fun(args_ty, ret_ty)
       let args = args.copy()
       args.push(closure_ref)
       self.fnblocks[f] = { args, free_vars, body }
 
       // Step 4. recurse on rest
 
+      let closure_gen = self.new_named(
+        "clo_\{f.to_string()}",
+        closure_ref.ty.val,
+      )
       if has_free_vars {
-        let fv_data_ty = T::Tuple(free_vars.map(fn { v => v.ty }))
         let freevars_captured = self.new_named("fvs_cap", fv_data_ty)
-        let closure_gen = self.new_named(
-          "clo_\{f.to_string()}",
-          T::Tuple([f.ty, fv_data_ty]),
-        )
         let rest_fixed = self.add_rebind(f, closure_gen).collect_closure(rest)
         Tuple(
           free_vars.map(Value::Var),
@@ -104,10 +110,6 @@ fn CloEnv::collect_closure(self : CloEnv, s : S) -> S {
           Tuple([Label(f), Var(freevars_captured)], closure_gen, rest_fixed),
         )
       } else {
-        let closure_gen = self.new_named(
-          "clo_\{f.to_string()}",
-          T::Tuple([f.ty, Unit]),
-        )
         let rest_fixed = self.add_rebind(f, closure_gen).collect_closure(rest)
         Tuple([Label(f), Unit], closure_gen, rest_fixed)
       }
@@ -119,7 +121,7 @@ fn CloEnv::collect_closure(self : CloEnv, s : S) -> S {
             Some(closure) => {
               args.push(Var(closure))
               // Calling a user level function
-              let tmp = self.new_named("fn_ptr", f_var.ty)
+              let tmp = self.new_named("fn_ptr", f_var.ty.val)
               KthTuple(0, Var(closure), tmp, App(Var(tmp), args.map(recrbva)))
             }
             None => @util.die("undefined function \{f} called")

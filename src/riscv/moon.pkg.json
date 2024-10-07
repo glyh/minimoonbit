@@ -1,6 +1,6 @@
 {
   "import": [
-    "moonbitlang/minimbt/closure",
+    "moonbitlang/minimbt/closureps",
     {
       "path": "moonbitlang/minimbt",
       "alias": "typing"

@@ -18,11 +18,11 @@ fn CloEnv::new(counter : Int) -> CloEnv {
 
 fn CloEnv::new_tmp(self : CloEnv, t : T) -> Var {
   self.counter.val = self.counter.val + 1
-  { name: { val: None }, id: self.counter.val, ty: t }
+  { name: { val: None }, id: self.counter.val, ty: { val: t } }
 }
 
 // NOTE: no worry of repeated names generated as all vars are marked by an uid
 fn CloEnv::new_named(self : CloEnv, name : String, t : T) -> Var {
   self.counter.val = self.counter.val + 1
-  { name: { val: Some(name) }, id: self.counter.val, ty: t }
+  { name: { val: Some(name) }, id: self.counter.val, ty: { val: t } }
 }

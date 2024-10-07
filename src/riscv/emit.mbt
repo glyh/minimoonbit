@@ -1,6 +1,4 @@
-pub fn emit(
-  _input : Unit // TODO
-) -> Array[AssemblyFunction] {
+pub fn emit(_input : @closureps.ClosurePS) -> Array[AssemblyFunction] {
   abort("todo")
 }
 

@@ -123,7 +123,11 @@ fn CompileStatus::step(self : CompileStatus) -> Bool {
   self.curr_stage >= self.end_stage
 }
 
-fn CompileStatus::output(self : CompileStatus, json : Bool) -> String {
+fn CompileStatus::output(
+  self : CompileStatus,
+  json : Bool,
+  closureps_verbose : Bool
+) -> String {
   if json {
     match self.curr_stage {
       Parse => self.source_code.unwrap()
@@ -142,8 +146,13 @@ fn CompileStatus::output(self : CompileStatus, json : Bool) -> String {
       PreCps => self.typechecked.unwrap().to_string()
       Cps => self.precps.unwrap().to_string()
       CloPS => self.cps.unwrap().to_string()
+      Asm =>
+        if closureps_verbose {
+          self.clops.unwrap().to_verbose()
+        } else {
+          self.clops.unwrap().to_string()
+        }
       // NOTE: add stages here.
-      Asm => self.clops.unwrap().to_string()
       Finished => @riscv.print_functions(self.asm.unwrap())
     }
   }
@@ -157,6 +166,7 @@ fn main {
   let json = Ref::new(false)
   let start_stage = Ref::new(Stages::Parse)
   let end_stage = Ref::new(Stages::Finished)
+  let closureps_verbose = Ref::new(false)
   let closureps_interpreter = Ref::new(false)
   let out_file = Ref::new("-")
   let print = Ref::new([])
@@ -189,6 +199,12 @@ fn main {
           },
         ),
         "End stage",
+      ),
+      (
+        "--clops-v",
+        "",
+        @ArgParser.Set(closureps_verbose),
+        "Show more information of closure passing style",
       ),
       (
         "--clops-interp",
@@ -257,7 +273,7 @@ fn main {
     let stop = status.step()
     if stages_to_print.contains(stg) {
       println("Stage: \{stg}")
-      println(status.output(json.val))
+      println(status.output(json.val, closureps_verbose.val))
     }
     if stop {
       break
@@ -277,7 +293,7 @@ fn main {
       v => ignore(v)
     }
   } else {
-    let out_string = status.output(json.val)
+    let out_string = status.output(json.val, closureps_verbose.val)
     if out_file.val == "-" {
       println(out_string)
     } else {

@@ -12,3 +12,15 @@ pub fn ClosurePS::to_string(self : ClosurePS) -> String {
   output += "[root]\n\{self.root}\n"
   output
 }
+
+// TODO: figure it out
+pub fn ClosurePS::to_verbose(self : ClosurePS) -> String {
+  let mut output = ""
+  for item in self.fnblocks.iter() {
+    let (name, def) = item
+    output += "\{name}, args: \{def.args}, freevars: \{def.free_vars}\n"
+    output += "\{def.body}\n\n"
+  }
+  output += "[root]\n\{self.root}\n"
+  output
+}

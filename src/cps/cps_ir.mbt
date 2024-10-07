@@ -1,7 +1,7 @@
 pub struct Var {
   name : Ref[String?]
   id : Int
-  ty : T
+  ty : Ref[T]
 }
 
 pub fn Var::hash_combine(self : Var, hasher : Hasher) -> Unit {
@@ -13,11 +13,7 @@ pub fn Var::op_equal(lhs : Var, rhs : Var) -> Bool {
 }
 
 fn Var::from_precps(v : @precps.Var, t : T) -> Var {
-  { id: v.id, name: { val: v.name }, ty: t }
-}
-
-pub fn Var::retype(self : Var, ty : T) -> Var {
-  { ..self, ty, }
+  { id: v.id, name: { val: v.name }, ty: { val: t } }
 }
 
 pub enum Value {
