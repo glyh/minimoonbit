@@ -23,7 +23,7 @@ pub fn Value::to_string(self : Value) -> String {
   }
 }
 
-impl Show for Cps with output(self, logger) {
+pub impl Show for Cps with output(self, logger) {
   logger.write_string(self.to_string())
 }
 
@@ -51,13 +51,24 @@ fn to_str(cps : Cps, ~ident : String = "") -> String {
     Switch(v, branches) =>
       ident +
       "switch(\{v}){\n" +
-      branches.map(fn { c => to_str(c, ident=ident + "  ") }).join(";\n") +
+      branches
+      .mapi(
+        fn(i, c) {
+          ident +
+          "  \{i} => {\n" +
+          to_str(c, ident=ident + "    ") +
+          "\n" +
+          ident +
+          "  }"
+        },
+      )
+      .join("\n") +
       "\n" +
       ident +
       "}"
     Prim(op, args, bind, rest) =>
       ident + "prim \{bind} = \{op}(\{args})\n" + rec(rest)
     App(f, args) => ident + "\{f}(\{args})"
-    Just(v) => ident + "return \{v}"
+    Exit => ident + "exit"
   }
 }

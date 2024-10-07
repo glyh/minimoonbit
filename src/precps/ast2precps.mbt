@@ -62,7 +62,8 @@ pub fn TyEnv::ast2precps(self : TyEnv, s : S) -> PreCps {
       Let(ty, bind, rec(rhs), env_new.ast2precps(rest))
     }
     LetRec(f, rest) => {
-      let (fvar, env_rest) = self.add(f.name.0, f.name.1)
+      // NOTE: we don't actually need any extra variables for simply refer to the function pointer once we've done closure conversion
+      let (fvar, env_rest) = self.add_label(f.name.0, f.name.1)
       let mut env_body = env_rest
       let args = []
       f.args.each(

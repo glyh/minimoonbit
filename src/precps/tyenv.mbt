@@ -34,6 +34,13 @@ pub fn TyEnv::add(self : TyEnv, name : String, ty : T) -> (Var, TyEnv) {
   (to_bind, { ..self, bindings, })
 }
 
+pub fn TyEnv::add_label(self : TyEnv, name : String, ty : T) -> (Var, TyEnv) {
+  self.counter.val = self.counter.val + 1
+  let to_bind = { id: self.counter.val, name: Some(name) }
+  let bindings = self.bindings.add(find_bind_key(to_bind), Label(ty, to_bind))
+  (to_bind, { ..self, bindings, })
+}
+
 pub fn TyEnv::add_many(self : TyEnv, args : Iter[(String, T)]) -> TyEnv {
   args.fold(
     init=self,

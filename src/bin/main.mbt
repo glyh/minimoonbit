@@ -102,7 +102,7 @@ fn CompileStatus::step(self : CompileStatus) -> Bool {
     }
     Cps => {
       let cpsenv = @cps.CpsEnv::new(self.counter)
-      let mut cps = cpsenv.precps2cps(self.precps.unwrap(), @cps.Cps::Just)
+      let mut cps = cpsenv.precps2cps(self.precps.unwrap(), fn { _ => Exit })
       cps = @cps.alias_analysis(cps)
       self.cps = Some(cps)
       self.counter = cpsenv.counter.val
@@ -152,15 +152,12 @@ fn CompileStatus::output(self : CompileStatus, json : Bool) -> String {
 fn main {
   let argv = @env.get_args()
   let mut file = None
-  let knf_opt_iters = Ref::new(10)
-  let knf_opt_inline_threshold = Ref::new(10)
 
   // Testing directives
   let json = Ref::new(false)
   let start_stage = Ref::new(Stages::Parse)
   let end_stage = Ref::new(Stages::Finished)
-  let knf_interpreter = Ref::new(false)
-  let closure_interpreter = Ref::new(false)
+  let closureps_interpreter = Ref::new(false)
   let out_file = Ref::new("-")
   let print = Ref::new([])
 
@@ -194,16 +191,10 @@ fn main {
         "End stage",
       ),
       (
-        "--knf-interpreter",
+        "--clops-interp",
         "",
-        @ArgParser.Set(knf_interpreter),
-        "Run with KNF interpreter",
-      ),
-      (
-        "--closure-interpreter",
-        "",
-        @ArgParser.Set(closure_interpreter),
-        "Run with closure interpreter",
+        @ArgParser.Set(closureps_interpreter),
+        "Run with closure passing style interpreter",
       ),
       (
         "--out-file",
@@ -220,34 +211,6 @@ fn main {
         @ArgParser.String(fn(s) { print.val = s.split(",").collect() }),
         "",
       ),
-      (
-        "--knf-opt-iters",
-        "N",
-        @ArgParser.String(
-          fn(s) {
-            let i = @strconv.parse_int?(s)
-            match i {
-              Ok(i) => knf_opt_iters.val = i
-              Err(_) => @util.die("Invalid number")
-            }
-          },
-        ),
-        "Number of optimization iterations",
-      ),
-      (
-        "--knf-opt-inline-threshold",
-        "N",
-        @ArgParser.String(
-          fn(s) {
-            let i = @strconv.parse_int?(s)
-            match i {
-              Ok(i) => knf_opt_inline_threshold.val = i
-              Err(_) => @util.die("Invalid number")
-            }
-          },
-        ),
-        "Inline threshold for KNF optimization",
-      ),
     ],
     fn(s) {
       if file.is_empty().not() {
@@ -260,12 +223,6 @@ fn main {
   )
 
   // Configure pipeline
-  //if knf_interpreter.val {
-  //  end_stage.val = Stages::Knf
-  //}
-  //if closure_interpreter.val {
-  //  end_stage.val = Stages::Closure
-  //}
   let stages_to_print = print.val.map(
     fn(s) {
       match Stages::from_string(s) {
@@ -308,32 +265,23 @@ fn main {
   }
 
   // Output
-  //if knf_interpreter.val {
-  //  let knfi = @knf_eval.KnfInterpreter::new()
-  //  add_interpreter_fns(knfi)
-  //  match knfi.eval_full?(status.knf.unwrap()) {
-  //    Ok(_) => ()
-  //    Err(Failure(e)) => {
-  //      println(e)
-  //      @util.die("KNF interpreter error")
-  //    }
-  //  }
-  //} else if closure_interpreter.val {
-  //  let clsi = @closure_eval.ClosureInterpreter::new()
-  //  add_closure_interpreter_fns(clsi)
-  //  match clsi.eval_full?(status.closure_ir.unwrap()) {
-  //    Ok(_) => ()
-  //    Err(Failure(e)) => {
-  //      println(e)
-  //      @util.die("Closure interpreter error")
-  //    }
-  //  }
-  //} else {
-  let out_string = status.output(json.val)
-  if out_file.val == "-" {
-    println(out_string)
+  if closureps_interpreter.val {
+    let clops = status.clops.unwrap()
+    let interpreter = @closureps_eval.CloPSInterpreter::new(clops)
+    add_clops_interp_fns(interpreter)
+    try {
+      interpreter.eval!(clops.root)
+    } catch {
+      VariableNotFind(v) => println("Undefined variable: \{v}")
+    } else {
+      v => ignore(v)
+    }
   } else {
-    @fs.write_to_string(out_file.val, out_string)
+    let out_string = status.output(json.val)
+    if out_file.val == "-" {
+      println(out_string)
+    } else {
+      @fs.write_to_string(out_file.val, out_string)
+    }
   }
-  //}
 }

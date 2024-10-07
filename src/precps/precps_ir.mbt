@@ -58,12 +58,12 @@ pub fn PreCps::get_type(self : PreCps) -> T {
   }
 }
 
-enum Numeric {
+pub enum Numeric {
   Double
   Int
 } derive(Show)
 
-enum PrimOp {
+pub enum PrimOp {
   Not
   MakeArray
   Neg(Numeric)

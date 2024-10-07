@@ -16,6 +16,10 @@ fn Var::from_precps(v : @precps.Var, t : T) -> Var {
   { id: v.id, name: { val: v.name }, ty: t }
 }
 
+pub fn Var::retype(self : Var, ty : T) -> Var {
+  { ..self, ty, }
+}
+
 pub enum Value {
   Var(Var)
   Label(Var)
@@ -40,7 +44,7 @@ pub enum Cps {
   Prim(PrimOp, Array[Value], Var, Cps)
   // T marks the return type
   App(Value, Array[Value])
-  Just(Value)
+  Exit
 }
 
 fn Cps::replace_var_bind(self : Cps, from : Var, to : Value) -> Cps {
@@ -76,7 +80,7 @@ fn Cps::replace_var_bind(self : Cps, from : Var, to : Value) -> Cps {
       Prim(op, args.map(recv), bind, rest_new)
     }
     App(f, args) => App(recv(f), args.map(recv))
-    Just(v) => Just(recv(v))
+    Exit => Exit
   }
 }
 
@@ -122,6 +126,6 @@ pub fn Cps::free_variables(self : Cps) -> @hashset.T[Var] {
         init=f.free_variables(),
         fn(acc, ele) { acc.union(ele.free_variables()) },
       )
-    Just(v) => v.free_variables()
+    Exit => @hashset.new()
   }
 }
