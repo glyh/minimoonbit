@@ -12,6 +12,7 @@
     },
     "moonbitlang/minimbt/precps",
     "moonbitlang/minimbt/closureps",
+    "moonbitlang/minimbt/ssacfg",
     "moonbitlang/minimbt/cps",
     "moonbitlang/minimbt/knf",
     "moonbitlang/minimbt/typing",

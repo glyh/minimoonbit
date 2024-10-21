@@ -24,3 +24,9 @@ __pycache__
 /submit.zip
 
 /tmp
+
+test/*
+!test/test_src
+!test/script.gdb
+!test/build_*
+!test/*_exe

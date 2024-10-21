@@ -22,6 +22,8 @@ pub fn TyEnv::new(externals : @immut/hashmap.T[String, T]) -> TyEnv {
   { bindings: externals, counter: { val: 0 } }
 }
 
+// We never actually use counter value 0.  
+// Such symbol is inserted manually when doing codegen, and it refers to main entry.
 pub fn TyEnv::gen_tmp(self : TyEnv) -> Var {
   self.counter.val = self.counter.val + 1
   { id: self.counter.val, name: None }

@@ -13,7 +13,7 @@ pub fn alias_analysis(c : Cps) -> Cps {
       }
     }
     Fix(f, args, body, rest) => Fix(f, args, rec(body), rec(rest))
-    Switch(v, branches) => Switch(v, branches.map(rec))
+    If(cond, _then, _else) => If(cond, rec(_then), rec(_else))
     Prim(op, vs, bind, rest) => Prim(op, vs, bind, rec(rest))
     c => c
   }

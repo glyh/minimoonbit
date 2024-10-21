@@ -5,6 +5,28 @@ struct CloEnv {
   fnblocks : @hashmap.T[Var, FuncDef]
   counter : Ref[Int]
   bindings : @immut/hashmap.T[Var, Var]
+  // NOTE: when collecting free vars of function body, 
+  // we may have to issue the collecter there's actually a closure pointer passed
+  // even if closure conversion is not done
+  pre_clo_gen : @hashmap.T[Var, Var]
+  named_fns : @hashset.T[Var]
+}
+
+fn CloEnv::collect_named_fns(self : CloEnv, c : @cps.Cps) -> Unit {
+  match c {
+    Tuple(_, _, c) | KthTuple(_, _, _, c) | Prim(_, _, _, c) =>
+      self.collect_named_fns(c)
+    Fix(f, _, body, rest) => {
+      self.named_fns.insert(f)
+      self.collect_named_fns(body)
+      self.collect_named_fns(rest)
+    }
+    If(_, _then, _else) => {
+      self.collect_named_fns(_then)
+      self.collect_named_fns(_else)
+    }
+    App(_) | MakeArray(_) | Exit => ()
+  }
 }
 
 fn CloEnv::add_rebind(self : CloEnv, name : Var, cb : Var) -> CloEnv {
@@ -13,7 +35,13 @@ fn CloEnv::add_rebind(self : CloEnv, name : Var, cb : Var) -> CloEnv {
 
 fn CloEnv::new(counter : Int) -> CloEnv {
   let counter = { val: counter }
-  { fnblocks: @hashmap.new(), counter, bindings: @immut/hashmap.new() }
+  {
+    fnblocks: @hashmap.new(),
+    counter,
+    bindings: @immut/hashmap.new(),
+    pre_clo_gen: @hashmap.new(),
+    named_fns: @hashset.new(),
+  }
 }
 
 fn CloEnv::new_tmp(self : CloEnv, t : T) -> Var {

@@ -14,6 +14,16 @@ struct CloPSInterpreter {
   mut cur_env : @hashmap.T[Var, Value]
 }
 
+// NOTE: no worry of repeated names generated as all vars are marked by an uid
+fn CloPSInterpreter::new_named(
+  self : CloPSInterpreter,
+  name : String,
+  t : @types.Type
+) -> Var {
+  self.clops.counter.val = self.clops.counter.val + 1
+  { name: { val: Some(name) }, id: self.clops.counter.val, ty: { val: t } }
+}
+
 pub typealias Var = @cps.Var
 
 pub typealias S = @cps.Cps
@@ -61,7 +71,7 @@ fn CloPSInterpreter::find(self : CloPSInterpreter, v : Var) -> Value!EvalError {
       match v.name.val {
         None => raise VariableNotFind(v)
         Some(name) =>
-          if self.extern_fns.contains(name) && v.id == -1 {
+          if self.extern_fns.contains(name) && v.id < 0 {
             ExternFn(name)
           } else {
             raise VariableNotFind(v)
@@ -83,6 +93,47 @@ fn CloPSInterpreter::eval_v(
   }
 }
 
+pub fn CloPSInterpreter::call(
+  self : CloPSInterpreter,
+  f_val : Value,
+  args_val : Array[Value],
+  closure_ref : Value
+) -> S {
+  let mut f_val = f_val
+  let mut args_val = args_val
+  //let mut closure_ref = closure_ref
+  while true {
+    guard let Label(address) = f_val else {
+      v => @util.die("jumping to non function \{v}")
+      //println("Cur function: \{f_val}")
+    }
+    match self.clops.fnblocks[address] {
+      None => {
+        let name = address.name.val.unwrap()
+        let (_, extern_fn) = self.extern_fns[name].unwrap()
+        let return_val = extern_fn(args_val)
+        let cont = closure_ref // that closure is actually a continuation
+        args_val = [return_val]
+        //closure_ref = Unit
+        guard let Tuple([fn_ptr, _]) = cont else {
+          v => @util.die("\{v} is not a closure")
+        }
+        f_val = fn_ptr
+      }
+      _ => break
+    }
+  }
+  guard let Label(address) = f_val else { _ => @util.die("unreachable") }
+  let f = self.clops.fnblocks[address].unwrap()
+  let new_env : @hashmap.T[Var, Value] = @hashmap.new()
+  //let args_to_pass = f.args.copy()
+  //args_to_pass.push(f.closure_ref)
+  zip2(f.args, args_val).each(fn { (k, v) => new_env[k] = v })
+  new_env[f.closure] = closure_ref
+  self.cur_env = new_env
+  f.body
+}
+
 pub fn CloPSInterpreter::eval(
   self : CloPSInterpreter,
   expr : S
@@ -100,29 +151,23 @@ pub fn CloPSInterpreter::eval(
     KthTuple(idx, val, bind, rest) => {
       match self.eval_v!(val) {
         Tuple(tup) => self.cur_env[bind] = tup[idx]
-        _ => @util.die("extrating members from non tuple")
+        result =>
+          @util.die("Extracting members from non tuple \{result} @ \{idx}")
       }
       continue rest
     }
     Fix(f, _, _, _) =>
       @util.die("Unexpected non-top level function definiton \{f}")
-    Switch(val, branches) =>
-      match self.eval_v!(val) {
-        Int(idx) => continue branches[idx]
-        _ => @util.die("branching on non ints")
+    If(cond, _then, _else) =>
+      match self.eval_v!(cond) {
+        Int(1) => continue _then
+        _ => continue _else
       }
     Prim(Not, [v], bind, rest) => {
       match self.eval_v!(v) {
         Int(1) => self.cur_env[bind] = Int(0)
         Int(0) => self.cur_env[bind] = Int(1)
         v => @util.die("unexpected input \{v} for `not`")
-      }
-      continue rest
-    }
-    Prim(MakeArray, [len, elem], bind, rest) => {
-      match (self.eval_v!(len), self.eval_v!(elem)) {
-        (Int(len), elem) => self.cur_env[bind] = Array(Array::make(len, elem))
-        (l, elem) => @util.die("unexpected input \{l}, \{elem} for `makearray`")
       }
       continue rest
     }
@@ -206,42 +251,29 @@ pub fn CloPSInterpreter::eval(
       continue rest
     }
     Prim(_) => @util.die("malformed prim call \{expr}")
-    App(f, args) => {
-      let mut f_val = self.eval_v!(f)
-      let mut args_evaled = []
-      for arg in args {
-        args_evaled.push(self.eval_v!(arg))
-      }
-      while true {
-        guard let Label(address) = f_val else {
-          v => @util.die("jumping to non function \{v}")
-        }
-        match self.clops.fnblocks[address] {
-          None => {
-            let name = address.name.val.unwrap()
-            let (args_needed, extern_fn) = self.extern_fns[name].unwrap()
-            // NOTE: There's 2 cases:
-            // 1. args_needed + 1 = args_passed, then last arg is continuation
-            // 2. args_needed + 2 = args_passed, then 2nd-to-last arg is continuation
-            let return_val = extern_fn(args_evaled)
-            let cont = args_evaled[args_needed] // rememeber index starts from 0
-            args_evaled = [return_val, cont]
-            guard let Tuple([fn_ptr, _]) = cont else {
-              v => @util.die("\{v} is not a closure")
-            }
-            f_val = fn_ptr
+    MakeArray(len, elem, kont_closure) =>
+      match (self.eval_v!(len), self.eval_v!(elem)) {
+        (Int(len), elem) => {
+          let arr = Array(Array::make(len, elem))
+          let closure_val = self.eval_v!(kont_closure)
+          guard let Tuple([fn_address, _]) = closure_val else {
+            _ =>
+              @util.die(
+                "evaluate to non closure passed in to makearray \{expr}",
+              )
           }
-          _ => break
+          continue self.call(fn_address, [arr], closure_val)
         }
+        (l, elem) => @util.die("unexpected input \{l}, \{elem} for `makearray`")
       }
-      guard let Label(address) = f_val else { _ => @util.die("unreachable") }
-      let f = self.clops.fnblocks[address].unwrap()
-      let new_env : @hashmap.T[Var, Value] = @hashmap.new()
-      //let args_to_pass = f.args.copy()
-      //args_to_pass.push(f.closure_ref)
-      zip2(f.args, args_evaled).each(fn { (k, v) => new_env[k] = v })
-      self.cur_env = new_env
-      continue f.body
+    App(f, args) => {
+      let f_val = self.eval_v!(f)
+      let args_val = []
+      for arg in args {
+        args_val.push(self.eval_v!(arg))
+      }
+      let closure_ref_val = args_val.pop().unwrap()
+      continue self.call(f_val, args_val, closure_ref_val)
     }
   }
 }

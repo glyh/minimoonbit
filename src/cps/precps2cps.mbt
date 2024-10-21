@@ -16,6 +16,15 @@ fn CpsEnv::precps2cps_list(
   g(a[:], @immut/list.of([]))
 }
 
+// any passed params might not use label, but they should use a var instead
+// as they're converted to closures later
+fn fix_label_to_var(v : Value) -> Value {
+  match v {
+    Label(l) => Var(l)
+    v => v
+  }
+}
+
 pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
   match s {
     Unit => c(Unit)
@@ -57,7 +66,7 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
       new_vars.push(k_ref)
       let f_ref = Var::from_precps(fn_name, new_f_type)
       fn fn_cont(returned : Value) {
-        App(Var(k_ref), [returned])
+        App(Var(k_ref), [returned].map(fix_label_to_var))
       }
 
       Fix(
@@ -66,20 +75,6 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
         self.precps2cps(body, fn_cont),
         self.precps2cps(rest, c),
       )
-    }
-    // (a1, a2, a3, .., an, (r) -> Unit)
-    App(ret_ty, f, args) => {
-      let k_ref = self.new_tmp(Fun([ret_ty], Unit))
-      let x_ref = self.new_tmp(ret_ty)
-      fn c1(f : Value) {
-        fn c2(es : @immut/list.T[Value]) {
-          App(f, es.iter().append(Var(k_ref)).collect())
-        }
-
-        self.precps2cps_list(args, c2)
-      }
-
-      Fix(k_ref, [x_ref], c(Var(x_ref)), self.precps2cps(f, c1))
     }
     Var(ty, v) => c(Var(Var::from_precps(v, ty)))
     Label(ty, v) => c(Label(Var::from_precps(v, ty)))
@@ -92,7 +87,47 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
 
       self.precps2cps_list(elements, c1)
     }
+    // (a1, a2, a3, .., an, (r) -> Unit)
+    App(ret_ty, f, args) => {
+      let k_ref = self.new_tmp(Fun([ret_ty], Unit))
+      let x_ref = self.new_tmp(ret_ty)
+      fn c1(f : Value) {
+        fn c2(es : @immut/list.T[Value]) {
+          App(f, es.iter().append(Var(k_ref)).map(fix_label_to_var).collect())
+        }
+
+        self.precps2cps_list(args, c2)
+      }
+
+      Fix(k_ref, [x_ref], c(Var(x_ref)), self.precps2cps(f, c1))
+    }
+
+    // WARN: Array Creation must come with an external call and thus continuation
+    Prim(ret_ty, MakeArray, rands) => {
+      let k_ref = self.new_tmp(Fun([ret_ty], Unit))
+      let x_ref = self.new_tmp(ret_ty)
+      fn c1(es : @immut/list.T[Value]) {
+        let args = es.to_array()
+        // len, elem, kont
+        MakeArray(args[0], args[1], Var(k_ref))
+      }
+
+      Fix(k_ref, [x_ref], c(Var(x_ref)), self.precps2cps_list(rands, c1))
+    }
     Prim(ty, rator, rands) => {
+      let rator = match rator {
+        Not => Not
+        Neg(n) => Neg(n)
+        Get => Get
+        Put => Put
+        Math(op, num) => Math(op, num)
+        Eq => Eq
+        Le => Le
+        MakeArray =>
+          @util.die(
+            "unreachable: precps -> cps, makearray should be dealt with eearlier",
+          )
+      }
       fn c1(a : @immut/list.T[Value]) {
         let tmp = self.new_tmp(ty)
         Prim(rator, a.iter().collect(), tmp, c(Var(tmp)))
@@ -114,22 +149,14 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
         let k_ref = self.new_tmp(Fun([ret_ty], Unit))
         let x_ref = self.new_tmp(ret_ty)
         fn c2(branch : Value) -> Cps {
-          App(Var(k_ref), [branch])
+          App(Var(k_ref), [branch].map(fix_label_to_var))
         }
 
         Fix(
           k_ref,
           [x_ref],
           c(Var(x_ref)),
-          Switch(
-            cond,
-            [
-              // 0: else branch
-              self.precps2cps(_else, c2),
-              // 1: then branch
-              self.precps2cps(_then, c2),
-            ],
-          ),
+          If(cond, self.precps2cps(_then, c2), self.precps2cps(_else, c2)),
         )
       }
 

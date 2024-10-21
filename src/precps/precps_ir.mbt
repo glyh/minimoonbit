@@ -61,7 +61,7 @@ pub fn PreCps::get_type(self : PreCps) -> T {
 pub enum Numeric {
   Double
   Int
-} derive(Show)
+} derive(Show, Eq, Hash)
 
 pub enum PrimOp {
   Not

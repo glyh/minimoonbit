@@ -6,6 +6,7 @@ enum Stages {
   Cps
   CloPS
   // NOTE: add stages here.
+  SsaCfg
   Asm
   Finished
 } derive(Show, Eq, Compare)
@@ -17,6 +18,7 @@ fn Stages::from_string(s : String) -> Stages? {
     "precps" => Some(Stages::PreCps)
     "cps" => Some(Stages::Cps)
     "clops" => Some(Stages::CloPS)
+    "ssacfg" => Some(Stages::SsaCfg)
     // NOTE: add stages here.
     "riscv" => Some(Stages::Asm)
     "finished" => Some(Stages::Finished)
@@ -30,7 +32,8 @@ fn Stages::next(self : Stages) -> Stages {
     Stages::Typecheck => Stages::PreCps
     Stages::PreCps => Stages::Cps
     Stages::Cps => Stages::CloPS
-    Stages::CloPS => Stages::Asm
+    Stages::CloPS => Stages::SsaCfg
+    Stages::SsaCfg => Stages::Asm
     // NOTE: add stages here.
     Stages::Asm => Stages::Finished
     Stages::Finished => Stages::Finished
@@ -47,6 +50,7 @@ struct CompileStatus {
   mut precps : @precps.PreCps?
   mut cps : @cps.Cps?
   mut clops : @closureps.ClosurePS?
+  mut cfg : @ssacfg.SsaCfg?
   // NOTE: add stages here.
   mut asm : Array[@riscv.AssemblyFunction]?
 }
@@ -66,6 +70,7 @@ fn CompileStatus::initialize(
     precps: None,
     cps: None,
     clops: None,
+    cfg: None,
     // NOTE: add stages here.
     asm: None,
   }
@@ -112,9 +117,13 @@ fn CompileStatus::step(self : CompileStatus) -> Bool {
       self.clops = Some(clops)
       self.counter = clops.counter.val
     }
+    SsaCfg => {
+      let cfg = @ssacfg.clops2ssacfg(self.clops.unwrap())
+      self.cfg = Some(cfg)
+    }
     // NOTE: add stages here.
     Asm => {
-      let real_asm = @riscv.emit(@util.die("TODO5"))
+      let real_asm = @riscv.emit(self.cfg.unwrap())
       self.asm = Some(real_asm)
     }
     Finished => ()
@@ -123,11 +132,7 @@ fn CompileStatus::step(self : CompileStatus) -> Bool {
   self.curr_stage >= self.end_stage
 }
 
-fn CompileStatus::output(
-  self : CompileStatus,
-  json : Bool,
-  closureps_verbose : Bool
-) -> String {
+fn CompileStatus::output(self : CompileStatus, json : Bool) -> String {
   if json {
     match self.curr_stage {
       Parse => self.source_code.unwrap()
@@ -135,6 +140,7 @@ fn CompileStatus::output(
       PreCps => @util.die("TODO1")
       Cps => @util.die("TODO2")
       CloPS => @util.die("TODO999")
+      SsaCfg => @util.die("TODO998")
       // NOTE: add stages here.
       Asm => @util.die("TODO3")
       Finished => @riscv.print_functions(self.asm.unwrap())
@@ -146,12 +152,8 @@ fn CompileStatus::output(
       PreCps => self.typechecked.unwrap().to_string()
       Cps => self.precps.unwrap().to_string()
       CloPS => self.cps.unwrap().to_string()
-      Asm =>
-        if closureps_verbose {
-          self.clops.unwrap().to_verbose()
-        } else {
-          self.clops.unwrap().to_string()
-        }
+      SsaCfg => self.clops.unwrap().to_string()
+      Asm => self.cfg.unwrap().to_string()
       // NOTE: add stages here.
       Finished => @riscv.print_functions(self.asm.unwrap())
     }
@@ -166,12 +168,9 @@ fn main {
   let json = Ref::new(false)
   let start_stage = Ref::new(Stages::Parse)
   let end_stage = Ref::new(Stages::Finished)
-  let closureps_verbose = Ref::new(false)
   let closureps_interpreter = Ref::new(false)
   let out_file = Ref::new("-")
   let print = Ref::new([])
-
-  // 
   @ArgParser.parse(
     [
       (
@@ -199,12 +198,6 @@ fn main {
           },
         ),
         "End stage",
-      ),
-      (
-        "--clops-v",
-        "",
-        @ArgParser.Set(closureps_verbose),
-        "Show more information of closure passing style",
       ),
       (
         "--clops-interp",
@@ -273,7 +266,7 @@ fn main {
     let stop = status.step()
     if stages_to_print.contains(stg) {
       println("Stage: \{stg}")
-      println(status.output(json.val, closureps_verbose.val))
+      println(status.output(json.val))
     }
     if stop {
       break
@@ -293,7 +286,7 @@ fn main {
       v => ignore(v)
     }
   } else {
-    let out_string = status.output(json.val, closureps_verbose.val)
+    let out_string = status.output(json.val)
     if out_file.val == "-" {
       println(out_string)
     } else {

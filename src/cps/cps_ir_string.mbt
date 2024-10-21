@@ -4,8 +4,8 @@ pub impl Show for Var with output(self, logger) {
 
 pub fn Var::to_string(self : Var) -> String {
   match self.name.val {
-    None => "?\{self.id}"
-    Some(n) => if self.id < 0 { n } else { "\{n}.\{self.id}" }
+    None => "_minimbt_\{self.id}"
+    Some(n) => if self.id < 0 { n } else { "_minimbt_\{n}_\{self.id}" }
   }
 }
 
@@ -48,27 +48,22 @@ fn to_str(cps : Cps, ~ident : String = "") -> String {
       ident +
       "}\n" +
       rec(rest)
-    Switch(v, branches) =>
+    If(cond, _then, _else) =>
       ident +
-      "switch(\{v}){\n" +
-      branches
-      .mapi(
-        fn(i, c) {
-          ident +
-          "  \{i} => {\n" +
-          to_str(c, ident=ident + "    ") +
-          "\n" +
-          ident +
-          "  }"
-        },
-      )
-      .join("\n") +
+      "if(\{cond}){\n" +
+      to_str(_then, ident=ident + "  ") +
+      "\n" +
+      ident +
+      "} else {\n" +
+      to_str(_else, ident=ident + "  ") +
       "\n" +
       ident +
       "}"
     Prim(op, args, bind, rest) =>
       ident + "prim \{bind} = \{op}(\{args})\n" + rec(rest)
     App(f, args) => ident + "\{f}(\{args})"
+    MakeArray(len, elem, kont) =>
+      ident + "Array::make(\{len}, \{elem}).then(\{kont})"
     Exit => ident + "exit"
   }
 }

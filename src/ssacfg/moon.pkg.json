@@ -1,6 +1,6 @@
 {
   "import": [
-    "moonbitlang/minimbt/ssacfg",
+    "moonbitlang/minimbt/closureps",
     "moonbitlang/minimbt/cps",
     "moonbitlang/minimbt/precps",
     {

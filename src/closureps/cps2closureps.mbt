@@ -14,6 +14,51 @@ fn CloEnv::rebind_value(self : CloEnv, v : Value) -> Value {
   }
 }
 
+fn CloEnv::collect_label_closure(self : CloEnv, s : S) -> @hashset.T[Var] {
+  match s {
+    Prim(_, _, _, rest) | Tuple(_, _, rest) | KthTuple(_, _, _, rest) =>
+      self.collect_label_closure(rest)
+    Fix(fn_name, _, body, rest) => {
+      let collected = self
+        .collect_label_closure(body)
+        .union(self.collect_label_closure(rest))
+      collected.remove(fn_name)
+      collected
+    }
+    If(_, _then, _else) =>
+      self.collect_label_closure(_then).union(self.collect_label_closure(_else))
+    App(f, _) => {
+      guard let Label(label) = f else { _ => return @hashset.new() }
+      if label.id < 0 {
+        return @hashset.new()
+      }
+      @hashset.of([label])
+    }
+    MakeArray(_, _, _) | Exit => @hashset.new()
+  }
+}
+
+fn CloEnv::get_closure(
+  self : CloEnv,
+  fn_name : Var,
+  ~closure_ty : T = Unit
+) -> Var {
+  match self.pre_clo_gen[fn_name] {
+    None => {
+      let generated = self.new_named("clo_\{fn_name.to_string()}", closure_ty)
+      // it's fine to have the type being unit as it'll be fixed later
+      self.pre_clo_gen[fn_name] = generated
+      generated
+    }
+    Some(gen) => {
+      if closure_ty != Unit {
+        gen.ty.val = closure_ty
+      }
+      gen
+    }
+  }
+}
+
 // collect all closures to top level and fix call convention
 // NOTE:
 // whenever we store a reference to an external call, we need to wrap it as a closure
@@ -37,81 +82,90 @@ fn CloEnv::collect_closure(self : CloEnv, s : S) -> S {
       )
     KthTuple(idx, v, bind, rest) =>
       KthTuple(idx, v, bind, self.add_rebind(bind, bind).collect_closure(rest))
-    Switch(v, branches) => Switch(v, branches.map(rec))
+    If(_cond, _then, _else) => If(_cond, rec(_then), rec(_else))
     Prim(op, args, bind, rest) =>
       Prim(op, args, bind, self.add_rebind(bind, bind).collect_closure(rest))
     Fix(f, args, body, rest) => {
-      // Step 1. recurse on body to collect free vars
-      // HACK: this is the closure passed into the function
-      // we set it's type to unit as we can't know it's type before collecting 
-      // free vars, but to collect free var we have to have it bound
-      let closure_ref = self.new_named("ref_\{f.to_string()}", T::Unit)
+      // Step 1. Collect free variables to generate free_var & closure
+      // NOTE: For unknown functions, we still need to pass them a closure
+      // and that param might be free. so we may need to add that as well.
+      let free_vars = self
+        .collect_label_closure(body)
+        .union(body.free_variables())
+        .iter()
+        .filter(fn(v) { v != f && not(args.contains(v)) })
+        .map(
+          fn(var) {
+            if self.named_fns.contains(var) {
+              self.get_closure(var)
+            } else {
+              var
+            }
+          },
+        )
+        .collect()
+      free_vars.sort()
+      let has_free_vars = free_vars.length() != 0
+      let free_var_tup_ty = if has_free_vars {
+        T::Tuple(free_vars.map(fn(v) { v.ty.val }))
+      } else {
+        T::Unit
+      }
+      let free_var_tuple = self.new_named(
+        "fv_\{f.to_string()}",
+        free_var_tup_ty,
+      )
+      let closure_ty = T::Tuple([f.ty.val, free_var_tup_ty])
+      let closure = self.get_closure(f, ~closure_ty)
+
+      // Step 2. load the free vars to body and recurse collection on it
+      let mut body_new = body
+      if has_free_vars {
+        body_new = free_vars.foldi(
+          init=body,
+          fn(idx, acc, ele) { KthTuple(idx, Var(free_var_tuple), ele, acc) },
+        )
+        body_new = KthTuple(1, Var(closure), free_var_tuple, body_new)
+      }
       let body_env = args
         .fold(init=self, fn(acc, ele) { acc.add_rebind(ele, ele) })
-        .add_rebind(f, closure_ref)
-      let mut body = body_env.collect_closure(body)
+        .add_rebind(f, closure)
+      //if f.id == 1 {
+      //  println(body_env.bindings)
+      //}
+      body_new = body_env.collect_closure(body_new)
 
-      // Step 2. Calculate free variables
-      let free_vars = body
-        .free_variables()
-        .iter()
-        .filter(fn(v) { v != closure_ref && not(args.contains(v)) })
-        .collect()
-      let has_free_vars = not(free_vars.is_empty())
-
-      // Step 3. Rewrap the body on demand
-      if has_free_vars {
-        let fn_ptr = self.new_named("fn_ptr", f.ty.val)
-        let fv_data_ty = T::Tuple(free_vars.map(fn { v => v.ty.val }))
-        let freevars = self.new_named("fvs", fv_data_ty)
-        body = free_vars.foldi(
-          init=body,
-          fn(idx, acc, ele) { KthTuple(idx, Var(freevars), ele, acc) },
-        )
-        body = KthTuple(
-          0,
-          Var(closure_ref),
-          fn_ptr,
-          KthTuple(1, Var(closure_ref), freevars, body),
-        )
-      }
-
-      // Step 4. Patching f's args and types
-      let fn_ptr_ty = f.ty.val
-      let fv_data_ty = if has_free_vars {
-        T::Tuple(free_vars.map(fn { v => v.ty.val }))
-      } else {
-        Unit
-      }
-      closure_ref.ty.val = T::Tuple([fn_ptr_ty, fv_data_ty])
-      guard let T::Fun(_args_ty, ret_ty) = f.ty.val else {
-        _ => @util.die("calling non function")
-        // NOTE: the following alters f's type 
-      }
-      let args_ty = _args_ty.copy()
-      args_ty.push(closure_ref.ty.val) // WARN: types are self-recursive now
-      f.ty.val = Fun(args_ty, ret_ty)
-      let args = args.copy()
-      args.push(closure_ref)
-      self.fnblocks[f] = { args, free_vars, body }
+      // Step 3. fill this function to fnblocks
+      self.fnblocks[f] = { args, free_vars, body: body_new, closure }
 
       // Step 4. recurse on rest
-
-      let closure_gen = self.new_named(
-        "clo_\{f.to_string()}",
-        closure_ref.ty.val,
-      )
+      let rest_fixed_inner = self.add_rebind(f, closure).collect_closure(rest)
+      //println(
+      //  "for \{f} we generated a closure of type \{closure_ty} on \{closure}",
+      //)
       if has_free_vars {
-        let freevars_captured = self.new_named("fvs_cap", fv_data_ty)
-        let rest_fixed = self.add_rebind(f, closure_gen).collect_closure(rest)
+        let freevars_captured = self.new_named("fvs_cap", free_var_tup_ty)
         Tuple(
           free_vars.map(Value::Var),
           freevars_captured,
-          Tuple([Label(f), Var(freevars_captured)], closure_gen, rest_fixed),
+          Tuple([Label(f), Var(freevars_captured)], closure, rest_fixed_inner),
         )
       } else {
-        let rest_fixed = self.add_rebind(f, closure_gen).collect_closure(rest)
-        Tuple([Label(f), Unit], closure_gen, rest_fixed)
+        Tuple([Label(f), Unit], closure, rest_fixed_inner)
+      }
+    }
+    MakeArray(len, elem, kont) => {
+      // pass on closure pointer, kont is generated so it's always a var
+      guard let Var(kont_var) = kont else {
+        _ => @util.die("generated a label continuation")
+      }
+      match self.bindings[kont_var] {
+        Some(closure) =>
+          // NOTE: delay the generation of platform-specific code to later phase
+          // This is because the convention for js and riscv is different 
+          MakeArray(len, elem, Var(closure))
+        None =>
+          @util.die("undefined continuation \{kont} called after making array")
       }
     }
     App(f, args) =>
@@ -127,9 +181,6 @@ fn CloEnv::collect_closure(self : CloEnv, s : S) -> S {
             None => @util.die("undefined function \{f} called")
           }
         Label(f_var) =>
-          // NOTE: always generate a call as if we're calling a closure. 
-          // Since there's no way for us to decide whether we're calling a 
-          // closure or not.
           match self.bindings[f_var] {
             Some(maybe_closure) => {
               args.push(Var(maybe_closure))

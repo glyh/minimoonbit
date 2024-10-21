@@ -103,8 +103,8 @@ export fn minimbt_create_array(n: u32, v: i32) [*]i32 {
     return @ptrCast(arr);
 }
 
-export fn minimbt_create_ptr_array(n: u32, init: u32) [*]u32 {
-    const arr = allocator.alloc(u32, n) catch @panic("Alloc failed!");
+export fn minimbt_create_ptr_array(n: u32, init: u64) [*]u64 {
+    const arr = allocator.alloc(u64, n) catch @panic("Alloc failed!");
     for (arr) |*item| {
         item.* = init;
     }
@@ -172,7 +172,7 @@ export fn mincaml_create_array(n: u32, v: i32) [*]i32 {
     return minimbt_create_array(n, v);
 }
 
-export fn mincaml_create_ptr_array(n: u32, init: u32) [*]u32 {
+export fn mincaml_create_ptr_array(n: u32, init: u64) [*]u64 {
     return minimbt_create_ptr_array(n, init);
 }
 

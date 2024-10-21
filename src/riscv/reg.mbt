@@ -41,6 +41,41 @@ pub enum Reg {
   T6
 } derive(Eq, Compare, Hash)
 
+let malloc_pointer : Reg = S1
+
+// we have so much more regs to utilize, lol
+let alloc_regs : Array[Reg] = [
+  // prefer saved reg first
+  S11,
+  S10,
+  S9,
+  S8,
+  S7,
+  S6,
+  S5,
+  S4,
+  S3,
+  S2,
+  // then use tmp reg
+  T0,
+  T1,
+  T2,
+  T3,
+  T4,
+  T5,
+  // use arg register last
+  A7,
+  A6,
+  A5,
+  A4,
+  A3,
+  A2,
+  A1,
+  A0,
+  // You know what, since all calls are tail call, you are free to use Ra
+  Ra,
+]
+
 pub let reg_temp_list : Array[Reg] = [T0, T1, T2, T3, T4, T5] // T6 <- swap
 
 pub let reg_saved_list : Array[Reg] = [
@@ -55,8 +90,8 @@ pub let reg_saved_list : Array[Reg] = [
   S8,
   S9,
   S10,
+  S11,
 ]
-// S11, <- closure pointer
 
 pub let reg_arg_list : Array[Reg] = [A0, A1, A2, A3, A4, A5, A6, A7]
 
@@ -68,8 +103,6 @@ pub let reg_allocatable_list : Array[Reg] = reg_callee_saved_list +
   reg_caller_saved_list
 
 pub let reg_fp : Reg = Fp
-
-pub let reg_closure : Reg = S11
 
 pub let reg_ret : Reg = A0
 
@@ -152,6 +185,40 @@ pub enum FReg {
   Ft11
 } derive(Eq, Compare, Hash)
 
+let alloc_fregs : Array[FReg] = [
+  Ft0,
+  Ft1,
+  Ft2,
+  Ft3,
+  Ft4,
+  Ft5,
+  Ft6,
+  Ft7,
+  Fs0,
+  Fs1,
+  Fa0,
+  Fa1,
+  Fa2,
+  Fa3,
+  Fa4,
+  Fa5,
+  Fa6,
+  Fa7,
+  Fs2,
+  Fs3,
+  Fs4,
+  Fs5,
+  Fs6,
+  Fs7,
+  Fs8,
+  Fs9,
+  Fs10,
+  Fs11,
+  Ft8,
+  Ft9,
+  Ft10,
+]
+
 pub let freg_temp_list : Array[FReg] = [
   Ft0,
   Ft1,
@@ -186,9 +253,6 @@ pub let freg_arg_list : Array[FReg] = [Fa0, Fa1, Fa2, Fa3, Fa4, Fa5, Fa6, Fa7]
 pub let freg_caller_saved_list : Array[FReg] = freg_temp_list + freg_arg_list
 
 pub let freg_callee_saved_list : Array[FReg] = freg_saved_list
-
-pub let freg_allocatable_list : Array[FReg] = freg_callee_saved_list +
-  freg_caller_saved_list
 
 pub let freg_ret : FReg = Fa0
 
@@ -233,4 +297,16 @@ pub fn FReg::to_string(self : FReg) -> String {
 
 impl Show for FReg with output(self, logger : Logger) {
   logger.write_string(self.to_string())
+}
+
+enum RegRef {
+  I(Reg)
+  F(FReg)
+} derive(Eq, Hash, Show)
+
+fn is_reg_saved(r : RegRef) -> Bool {
+  match r {
+    F(r) => freg_callee_saved_list.contains(r)
+    I(r) => reg_callee_saved_list.contains(r)
+  }
 }

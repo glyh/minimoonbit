@@ -66,6 +66,7 @@ pub enum RvAsm {
   FeqD(Reg, FReg, FReg)
   FleD(Reg, FReg, FReg)
   FmvDX(FReg, Reg)
+  FmvXD(Reg, FReg)
   // pseudo instructions
   Nop
   La(Reg, Label)
@@ -80,6 +81,7 @@ pub enum RvAsm {
   Call(Label)
   Tail(Label)
   Ret
+  Seqz(Reg, Reg)
   // Comments
   Label(String)
   Comment(String)
@@ -168,6 +170,7 @@ impl Show for RvAsm with output(self, logger) {
     _ => logger.write_string("  ")
   }
   match self {
+    Seqz(rd, rs1) => write2(logger, "seqz", rd, rs1)
     Add(rd, rs1, rs2) => write3(logger, "add", rd, rs1, rs2)
     Sub(rd, rs1, rs2) => write3(logger, "sub", rd, rs1, rs2)
     Xor(rd, rs1, rs2) => write3(logger, "xor", rd, rs1, rs2)
@@ -227,6 +230,7 @@ impl Show for RvAsm with output(self, logger) {
     FeqD(rd, rs1, rs2) => write3(logger, "feq.d", rd, rs1, rs2)
     FleD(rd, rs1, rs2) => write3(logger, "fle.d", rd, rs1, rs2)
     FmvDX(rd, rs1) => write2(logger, "fmv.d.x", rd, rs1)
+    FmvXD(rd, rs1) => write2(logger, "fmv.x.d", rd, rs1)
     Nop => logger.write_string("nop")
     La(rd, label) => {
       logger.write_string("la ")

@@ -4,5 +4,6 @@ pub struct FuncDef {
   free_vars : Array[Var]
   // closure is a tuple of function pointer
   // and a tuple of free variables
-  body : S
+  mut body : S
+  closure : Var
 }

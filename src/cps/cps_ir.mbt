@@ -4,6 +4,10 @@ pub struct Var {
   ty : Ref[T]
 }
 
+pub fn Var::compare(lhs : Var, rhs : Var) -> Int {
+  lhs.id.compare(rhs.id)
+}
+
 pub fn Var::hash_combine(self : Var, hasher : Hasher) -> Unit {
   hasher.combine(self.id)
 }
@@ -31,15 +35,38 @@ fn Value::replace_var_bind(self : Value, from : Var, to : Value) -> Value {
   }
 }
 
+pub fn Value::get_type(self : Value) -> T {
+  match self {
+    Var(var) | Label(var) => var.ty.val
+    Unit => Unit
+    Int(_) => Int
+    Double(_) => Double
+  }
+}
+
+pub enum PrimOp {
+  Not
+  Neg(@precps.Numeric)
+  Get
+  Put
+  Math(@top.Op, @precps.Numeric)
+  Eq
+  Le
+} derive(Show)
+
 pub enum Cps {
   // T marks the binding's type
   Tuple(Array[Value], Var, Cps)
   KthTuple(Int, Value, Var, Cps)
   Fix(Var, Array[Var], Cps, Cps)
-  Switch(Value, Array[Cps])
+  If(Value, Cps, Cps)
   Prim(PrimOp, Array[Value], Var, Cps)
   // T marks the return type
   App(Value, Array[Value])
+  // len, elem, continuation
+  MakeArray(Value, Value, Value)
+  // TODO: add this to make external call more efficient
+  //ExternCall()
   Exit
 }
 
@@ -70,12 +97,13 @@ fn Cps::replace_var_bind(self : Cps, from : Var, to : Value) -> Cps {
       let rest_new = if from != name { rec(rest) } else { body }
       Fix(name, args, body_new, rest_new)
     }
-    Switch(v, branches) => Switch(recv(v), branches.map(rec))
+    If(cond, _then, _else) => If(recv(cond), rec(_then), rec(_else))
     Prim(op, args, bind, rest) => {
       let rest_new = if from != bind { rec(rest) } else { rest }
       Prim(op, args.map(recv), bind, rest_new)
     }
     App(f, args) => App(recv(f), args.map(recv))
+    MakeArray(len, elem, cont) => MakeArray(recv(len), recv(elem), recv(cont))
     Exit => Exit
   }
 }
@@ -107,11 +135,11 @@ pub fn Cps::free_variables(self : Cps) -> @hashset.T[Var] {
       args.each(fn { a => fv_body.remove(a) })
       fv_body.union(fv_rest)
     }
-    Switch(v, branches) =>
-      branches.fold(
-        init=v.free_variables(),
-        fn(acc, ele) { acc.union(ele.free_variables()) },
-      )
+    If(cond, _then, _else) =>
+      cond
+      .free_variables()
+      .union(_then.free_variables())
+      .union(_else.free_variables())
     Prim(_, args, bind, rest) => {
       let fv_rest = rest.free_variables()
       fv_rest.remove(bind)
@@ -122,6 +150,11 @@ pub fn Cps::free_variables(self : Cps) -> @hashset.T[Var] {
         init=f.free_variables(),
         fn(acc, ele) { acc.union(ele.free_variables()) },
       )
+    MakeArray(len, elem, cont) =>
+      len
+      .free_variables()
+      .union(elem.free_variables())
+      .union(cont.free_variables())
     Exit => @hashset.new()
   }
 }
