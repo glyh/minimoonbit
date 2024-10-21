@@ -492,11 +492,16 @@ fn CodegenBlock::call_c_conv_aligned(
 
   // 4. move the return value to somewhere else, this has to be done before loading the regs
   // this step does dirty.
-  self.mov_reg(reg_ret, I(A0))
+  if reg_ret != I(A0) {
+    self.mov_reg(reg_ret, I(A0))
+  }
 
   // 5. load all modifed regs
   to_store.rev_each(
     fn(stored) {
+      if stored == reg_ret {
+        return  // if we have a that reg occupied for return value, skip it.
+      }
       //self.dirtied.remove(stored)
       match stored {
         I(reg) => { // NOTE: we have no idea if it's a pointer or int on that reg
@@ -521,6 +526,8 @@ fn CodegenBlock::call_c_conv_aligned(
 // and thus MakeArray & MakeTuple can be done more efficiently
 // 2. However, I must set up my own stack, so there's no risk of 
 // stack overflow
+// 3. allocation for array can also be push to front so we don't repeatedly
+// save & load regs
 
 fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
   let block = self.cfg.blocks[self.block_label].unwrap()
@@ -556,11 +563,17 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
   for inst in block.insts {
     self.insert_asm(Comment(inst.to_string()))
     match inst {
-      Load(var) =>
-        match var.ty.val {
-          Double => ignore(self.pull_val_f(Var(var)))
-          _ => ignore(self.pull_val_i(Var(var)))
+      Load(var) => {
+        let offset = self.spilled_offset[var].unwrap()
+        match get_reg_ty(Var(var)) {
+          F64 =>
+            self.assign_f(var, fn(freg) { [Fld(freg, { base: Sp, offset })] })
+          I32 => self.assign_i(var, fn(reg) { [Lw(reg, { base: Sp, offset })] })
+          PTR64 =>
+            self.assign_i(var, fn(reg) { [Ld(reg, { base: Sp, offset })] })
+          Void => self.assign_i(var, fn(reg) { [Mv(reg, Zero)] })
         }
+      }
       Store(var) => {
         let offset = self.spilled_offset[var].unwrap()
         self.store_val(Var(var), { base: Sp, offset })
@@ -649,11 +662,8 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
       Prim(bind, Get, [arr, idx]) => {
         let reg_idx = self.pull_val_i(idx)
         let reg_arr = self.pull_val_i(arr)
-        if reg_idx == reg_arr {
-          @util.die("unreachable get array")
-          // HACK: arr may never be constant so it's safe to have 2 pulls
-        }
         match get_reg_ty(Var(bind)) {
+          Void => self.assign_i(bind, fn { reg => [Mv(reg, Zero)] })
           F64 =>
             self.assign_f(
               bind,
@@ -668,7 +678,7 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
                   ]
               },
             )
-          I32 | Void =>
+          I32 =>
             self.assign_i(
               bind,
               fn {
@@ -698,23 +708,24 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
             )
         }
       }
-      // TODO: may generate more higher quality asm if idx is known at compile time
-      Prim(_, Put, [arr, idx, rhs]) => {
-        // HACK: arr may never be constant so it's safe to have 2 pulls
+      Prim(bind, GetArrPtr, [arr, idx]) => {
         let reg_idx = self.pull_val_i(idx)
         let reg_arr = self.pull_val_i(arr)
-        let reg_type = get_reg_ty(rhs)
-        self.insert_asms(
-          [
-            // HACK: arr may not be swap reg but idx may be.
-            // this is due to we have no array literals
-            Slli(reg_swap, reg_idx, reg_type.byte_size_bits()),
-            Add(reg_swap, reg_swap, reg_arr),
-          ],
+        guard let Array(elem_ty) = arr.get_type()
+        let elem_ty = ty_get_reg_ty(elem_ty)
+        self.assign_i(
+          bind,
+          fn(reg) {
+            [
+              Slli(reg_swap, reg_idx, elem_ty.byte_size_bits()),
+              Add(reg, reg_swap, reg_arr),
+            ]
+          },
         )
-        self.store_val(rhs, { base: reg_swap, offset: 0 })
-        // HACK: don't ever assign to anything of type unit: 
-        // whenever it's pulled, we just assign 0
+      }
+      Prim(_, StoreToPtr, [rhs, ptr]) => {
+        let reg_ptr = self.pull_val_i(ptr)
+        self.store_val(rhs, { base: reg_ptr, offset: 0 })
       }
       Prim(bind, Math(op, Int), [lhs, rhs]) => {
         let reg_lhs = self.pull_val_i(lhs)
@@ -812,7 +823,9 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
       self.resolve_loop([(continuation, I(A1))])
       // 3. Generate the call to continuation
       let cont_reg = self.pull_val_i(continuation)
-      self.insert_asm(Jr(cont_reg))
+      self.insert_asms(
+        [Ld(cont_reg, { base: cont_reg, offset: 0 }), Jr(cont_reg)],
+      )
     }
     Call(f, args) => {
       // 1. Fill in the params to regs

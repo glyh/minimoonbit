@@ -1,9 +1,20 @@
+pub enum PrimOp {
+  Not
+  Neg(@precps.Numeric)
+  Get
+  GetArrPtr
+  StoreToPtr
+  Math(@typing.Op, @precps.Numeric)
+  Eq
+  Le
+} derive(Show)
+
 pub enum Inst {
   // cps ir
   MakeTuple(Var, Array[Value])
   KthTuple(Var, Value, Int)
   // primitives
-  Prim(Var, @cps.PrimOp, Array[Value])
+  Prim(Var, PrimOp, Array[Value])
   // for reg allocation spilling
   Store(Var)
   Load(Var)
@@ -52,9 +63,11 @@ fn SsaCfg::new_fn_block(
   { fn_name, from: None, insts: [], last_inst: { val: Exit } }
 }
 
-fn SsaCfg::new_named(self : SsaCfg, name : String) -> Var {
+fn SsaCfg::new_named(
+  self : SsaCfg,
+  name : String,
+  ~ty : @typing.Type = Unit
+) -> Var {
   self.counter += 1
-  // NOTE: for control flow connection poitns there's no reason for us to 
-  // generate a type for it.
-  { name: { val: Some(name) }, id: self.counter, ty: { val: Unit } }
+  { name: { val: Some(name) }, id: self.counter, ty: { val: ty } }
 }

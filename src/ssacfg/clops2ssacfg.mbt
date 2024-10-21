@@ -15,12 +15,46 @@ fn SsaCfg::cps2block(
       cur_block.insts.push(KthTuple(bind, tup, idx))
       continue rest
     }
-    Prim(op, args, bind, rest) => {
-      cur_block.insts.push(Prim(bind, op, args))
+    Prim(Not, args, bind, rest) => {
+      cur_block.insts.push(Prim(bind, Not, args))
       continue rest
     }
+    Prim(Neg(n), args, bind, rest) => {
+      cur_block.insts.push(Prim(bind, Neg(n), args))
+      continue rest
+    }
+    Prim(Get, args, bind, rest) => {
+      cur_block.insts.push(Prim(bind, Get, args))
+      continue rest
+    }
+    Prim(Math(op, n), args, bind, rest) => {
+      cur_block.insts.push(Prim(bind, Math(op, n), args))
+      continue rest
+    }
+    Prim(Eq, args, bind, rest) => {
+      cur_block.insts.push(Prim(bind, Eq, args))
+      continue rest
+    }
+    Prim(Le, args, bind, rest) => {
+      cur_block.insts.push(Prim(bind, Le, args))
+      continue rest
+    }
+    // NOTE: we have to break store into 2 3AC because we need 2 tmps
+    Prim(Put, [arr, idx, rhs], bind, rest) => {
+      let ptr = self.new_named("element_ptr", ty=@typing.Type::Ptr)
+      cur_block.insts.append(
+        [
+          Prim(ptr, GetArrPtr, [arr, idx]),
+          Prim(bind, StoreToPtr, [rhs, Var(ptr)]),
+        ],
+      )
+      continue rest
+    }
+    Prim(Put, args, _, _) => @util.die("unexpect args \{args} for put")
     Fix(_) => @util.die("unexpected nested function")
     If(cond, _then, _else) => {
+      // NOTE: for control flow connection points there's no reason for us to 
+      // generate a type for it.
       // NOTE: complete cur block; phis need to be fixed, but we'll deal with it in a later pass 
       let label_then = self.new_named("then")
       let label_else = self.new_named("else")
