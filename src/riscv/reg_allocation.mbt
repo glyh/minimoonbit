@@ -1,6 +1,32 @@
 // REF: 
 // - Modern Compiler Implementation in ML - Andrew W. Appel
 
+fn resolve_arg_regs(args : Array[Value]) -> Array[(Value, RegRef)] {
+  let args_regs_list : Array[(Value, RegRef)] = []
+  loop (args[:], reg_arg_list[:], freg_arg_list[:]) {
+    ([], _, _) => break args_regs_list
+    ([val, .. as args], reg_args, freg_args) => {
+      let (reg_next, reg_args, freg_args) = match get_reg_ty(val) {
+        F64 => {
+          guard let [freg, .. as freg_args] = freg_args else {
+            _ => @util.die("not enough freg")
+          }
+          (F(freg), reg_args, freg_args)
+        }
+        I32 | PTR64 => {
+          guard let [reg, .. as reg_args] = reg_args else {
+            _ => @util.die("not enough reg")
+          }
+          (I(reg), reg_args, freg_args)
+        }
+        Void => (I(Zero), reg_args, freg_args)
+      }
+      args_regs_list.push((val, reg_next))
+      continue (args, reg_args, freg_args)
+    }
+  }
+}
+
 fn reg_allocate_on_fn(
   input : @ssacfg.SsaCfg,
   fn_label : Var
@@ -12,25 +38,13 @@ fn reg_allocate_on_fn(
   let allocation_f : @hashmap.T[Var, FReg] = @hashmap.new()
   // allocate for args
   let params = input.fn_args[fn_label].unwrap()
-  loop (params[:], reg_arg_list[:], freg_arg_list[:]) {
-    ([], _, _) => break
-    ([param, .. as param_rest], iregs, fregs) =>
-      match param.ty.val {
-        Double => {
-          guard let [freg, .. as fregs] = fregs else {
-            _ => @util.die("no i64 register can be assigned to \{param}")
-          }
-          allocation_f[param] = freg
-          continue (param_rest, iregs, fregs)
-        }
-        _ => {
-          guard let [ireg, .. as iregs] = iregs else {
-            _ => @util.die("no i64 register can be assigned to \{param}")
-          }
-          allocation_i[param] = ireg
-          continue (param_rest, iregs, fregs)
-        }
-      }
+  for item in resolve_arg_regs(params.map(@cps.Value::Var)) {
+    let (value, reg) = item
+    guard let Var(var) = value else { v => @util.die("got \{v}") }
+    match reg {
+      I(ireg) => allocation_i[var] = ireg
+      F(freg) => allocation_f[var] = freg
+    }
   }
   let simplify_stack_i = []
   let simplify_stack_f = []

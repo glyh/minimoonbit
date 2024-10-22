@@ -188,7 +188,7 @@ fn CodegenBlock::assign_i(
     return
   }
   guard let I(target) = self.find_reg(var) else {
-    _ => @util.die("assigning to non i reg with `assign_i`")
+    reg => @util.die("assigning to \{reg} with `assign_i` @ \{var}")
   }
   self.insert_asms(todo(target))
 }
@@ -199,7 +199,8 @@ fn CodegenBlock::assign_f(
   todo : (FReg) -> Array[RvAsm]
 ) -> Unit {
   guard let F(target) = self.find_reg(var) else {
-    _ => @util.die("assigning to non f reg with `assign_f`")
+    I(Zero) => return  // meaning the value is not used
+    reg => @util.die("assigning to \{reg} with `assign_f` @ \{var}")
   }
   self.insert_asms(todo(target))
 }
@@ -439,35 +440,6 @@ fn get_tuple_offset(t : T, idx : Int) -> Int {
   }
 }
 
-fn CodegenBlock::resolve_arg_regs(
-  _self : CodegenBlock,
-  args : Array[Value]
-) -> Array[(Value, RegRef)] {
-  let args_regs_list : Array[(Value, RegRef)] = []
-  loop (args[:], reg_arg_list[:], freg_arg_list[:]) {
-    ([], _, _) => break args_regs_list
-    ([val, .. as args], reg_args, freg_args) => {
-      let (reg_next, reg_args, freg_args) = match get_reg_ty(val) {
-        F64 => {
-          guard let [freg, .. as freg_args] = freg_args else {
-            _ => @util.die("not enough freg")
-          }
-          (F(freg), reg_args, freg_args)
-        }
-        I32 | PTR64 => {
-          guard let [reg, .. as reg_args] = reg_args else {
-            _ => @util.die("not enough reg")
-          }
-          (I(reg), reg_args, freg_args)
-        }
-        Void => (I(Zero), reg_args, freg_args)
-      }
-      args_regs_list.push((val, reg_next))
-      continue (args, reg_args, freg_args)
-    }
-  }
-}
-
 fn CodegenBlock::new_label(self : CodegenBlock, prefix : String) -> String {
   let var = self.cfg.new_named(prefix)
   var.to_string()
@@ -475,6 +447,8 @@ fn CodegenBlock::new_label(self : CodegenBlock, prefix : String) -> String {
 
 // PERF: proritize the use of saved regs in stead of putting onto stack
 // take care not to introduce a chain reaction where you dirty s regs
+
+// BUG: we didn't consider spilled registers here
 fn CodegenBlock::call_c_conv_aligned(
   self : CodegenBlock,
   target : String,
@@ -487,7 +461,9 @@ fn CodegenBlock::call_c_conv_aligned(
     .iter()
     .filter(
       fn(reg) {
-        not(is_reg_saved(reg) || [I(reg_swap), F(freg_swap)].contains(reg))
+        not(
+          is_reg_saved(reg) || [I(reg_swap), F(freg_swap), I(Sp)].contains(reg),
+        )
       },
     )
     .collect()
@@ -508,7 +484,7 @@ fn CodegenBlock::call_c_conv_aligned(
     }
   }
   // 2. Fill in the params to regs
-  let args_regs_list = self.resolve_arg_regs(args)
+  let args_regs_list = resolve_arg_regs(args)
   // 2. Generate an assign order
   //  WARN: these steps may dirty too many regs
   //  so we don't use insert_asm/insert_asms
@@ -940,7 +916,13 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
     MakeArray(len, elem, continuation) => {
       // 1. call to generate an array
       // we keep the result at 1st reg so we call the continuation immediately
-      self.call_c_conv_aligned("minimbt_create_array", [len, elem], I(A0))
+      let create_array_fn = "minimbt_" +
+        (match get_reg_ty(elem) {
+          F64 => "create_float_array"
+          I32 | Void => "create_array"
+          PTR64 => "create_ptr_array"
+        })
+      self.call_c_conv_aligned(create_array_fn, [len, elem], I(A0))
 
       // 2. prepare regs for continuation. A0 is already the array
       self.resolve_loop([(continuation, I(A1))])
@@ -952,7 +934,7 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
     }
     Call(f, args) => {
       // 1. Fill in the params to regs
-      let args_regs_list = self.resolve_arg_regs(args)
+      let args_regs_list = resolve_arg_regs(args)
       // 2. Generate an assign order
       self.resolve_loop(args_regs_list)
       // 3. Generate the call

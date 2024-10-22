@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+./build_all $1
+./run_exe $1

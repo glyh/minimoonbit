@@ -14,9 +14,9 @@ pub let externals_list : Array[(String, Type)] = [
   ("sin", Fun([Double], Double)),
   ("cos", Fun([Double], Double)),
   ("atan", Fun([Double], Double)),
-  ("create_array", Fun([Int], Array(Int))),
-  ("create_float_array", Fun([Int], Array(Double))),
-  ("create_ptr_array", Fun([Int], Array(Ptr))),
+  ("create_array", Fun([Int, Int], Array(Int))),
+  ("create_float_array", Fun([Int, Double], Array(Double))),
+  ("create_ptr_array", Fun([Int, Ptr], Array(Ptr))),
 ]
 
 pub let externals : @immut/hashmap.T[String, Type] = externals_list.iter()

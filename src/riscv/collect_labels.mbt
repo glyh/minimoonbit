@@ -60,6 +60,8 @@ fn collect_externals(cfg : @ssacfg.SsaCfg) -> ExternalLabels {
         collect_label_val(len)
         collect_label_val(elem)
         collect_label_val(kont)
+        // NOTE: make array itself doesn't count because we generate direct call
+        // to unwrapped functions
       }
       Exit => ()
     }
