@@ -1,4 +1,3 @@
-// TODO: create base env that includes closure of non closures
 pub enum Value {
   Unit
   Int(Int)

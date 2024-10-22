@@ -41,8 +41,6 @@ pub enum Reg {
   T6
 } derive(Eq, Compare, Hash)
 
-let malloc_pointer : Reg = S1
-
 // we have so much more regs to utilize, lol
 let alloc_regs : Array[Reg] = [
   // prefer saved reg first
@@ -56,6 +54,7 @@ let alloc_regs : Array[Reg] = [
   S4,
   S3,
   S2,
+  S1,
   // then use tmp reg
   T0,
   T1,

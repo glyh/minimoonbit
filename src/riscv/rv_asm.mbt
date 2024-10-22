@@ -83,8 +83,11 @@ pub enum RvAsm {
   Ret
   Seqz(Reg, Reg)
   DWord(String)
+  Align(Int)
+  Skip(Int)
   // Comments
   Label(String)
+  Section(String)
   Comment(String)
 }
 
@@ -167,7 +170,7 @@ fn write2[TReg1 : Show, TReg2 : Show](
 
 impl Show for RvAsm with output(self, logger) {
   match self {
-    Label(_) => ()
+    Label(_) | Section(_) => ()
     _ => logger.write_string("  ")
   }
   match self {
@@ -274,9 +277,21 @@ impl Show for RvAsm with output(self, logger) {
       logger.write_string(".dword ")
       logger.write_string(data)
     }
+    Align(offset) => {
+      logger.write_string(".align ")
+      logger.write_string(offset.to_string())
+    }
+    Skip(offset) => {
+      logger.write_string(".skip ")
+      logger.write_string(offset.to_string())
+    }
     Label(label) => {
       logger.write_string(label)
       logger.write_string(":")
+    }
+    Section(section) => {
+      logger.write_string(".section ")
+      logger.write_string(section)
     }
     Comment(comment) => {
       logger.write_string("# ")

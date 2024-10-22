@@ -1,4 +1,3 @@
-// TODO: create base env that includes closure of non closures
 struct JsEmitter {
   clops : @closureps.ClosurePS
   indent : Int

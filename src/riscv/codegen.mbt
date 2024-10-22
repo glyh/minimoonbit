@@ -1,5 +1,3 @@
-// TODO: do all allocation at entrance of a block so we don't push and pull regs all the time
-
 enum RegTy {
   I32
   PTR64
@@ -58,28 +56,33 @@ struct CodegenBlock {
 
 let global_entrance = "minimbt_main"
 
+fn generate_name(name_var : Var) -> String {
+  let is_entrance = name_var.id == 0
+  if is_entrance {
+    global_entrance
+  } else {
+    name_var.to_string()
+  }
+}
+
 fn CodegenBlock::new(
   cfg : @ssacfg.SsaCfg,
   allocation : @hashmap.T[Var, RegRef],
   name_var : Var
 ) -> CodegenBlock {
-  let is_extrance = name_var.id == 0
-  let name = if is_extrance { global_entrance } else { name_var.to_string() }
+  let is_entrance = name_var.id == 0
+  let name = generate_name(name_var)
   // 1. generate prologue
-  let cur_fn : AssemblyFunction = { name, export: is_extrance, body: [] }
-  // stores global exit point
-  if cfg.func_no_free_vars.contains(name_var) {
-    // Generate a global closure for any function that doesn't take free vars
-    cur_fn.body.append(
-      [Label(cfg.label_to_closure[name_var].unwrap().to_string()), DWord(name)],
-    )
-  }
+  let cur_fn : AssemblyFunction = { name, export: is_entrance, body: [] }
   cur_fn.body.append(
     [
       Label(name),
       Comment("args: " + cfg.fn_args[name_var].unwrap().to_string()),
     ],
   )
+  if is_entrance {
+    cur_fn.body.append([Comment("set up stack"), La(Sp, "stack_space_end")])
+  }
 
   // 2. collect dirtied regs
   let dirtied = @hashset.new()
@@ -423,7 +426,6 @@ fn CodegenBlock::resolve_loop(
 fn get_tuple_offset(t : T, idx : Int) -> Int {
   // we may pass in a function
   // then it's converted to tuple during closure conversion
-  //println(t)
   match t {
     Tuple(tys) => {
       let mut result = 0
@@ -556,21 +558,12 @@ fn CodegenBlock::call_c_conv_aligned(
   )
 }
 
-// TODO: 
-// 1. I just figure out that all allocation can be done on stack
-// and thus MakeArray & MakeTuple can be done more efficiently
-// 2. However, I must set up my own stack, so there's no risk of 
-// stack overflow
-// 3. allocation for array can also be push to front so we don't repeatedly
-// save & load regs
-
 fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
   let block = self.cfg.blocks[self.block_label].unwrap()
   // as long as the entrance of the body is the first block, our codegen order doesn't matter too much.
   // 1. Do all mallocs for tuples together
   let malloc_offsets : @hashmap.T[Var, Int] = @hashmap.new()
   let mut malloc_offset_cur = 0
-  //println(self.block_label)
   for inst in block.insts {
     guard let MakeTuple(bind, vals) = inst else {
       _ => continue
@@ -578,20 +571,14 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
     }
     let mut tuple_byte_size = 0
     for val in vals {
-      //println(
-      //  "  \{bind} acc with \{val} \{get_reg_ty(val)} \{get_reg_ty(val).byte_size()}",
-      //)
       tuple_byte_size += get_reg_ty(val).byte_size()
     }
     malloc_offsets[bind] = malloc_offset_cur
     malloc_offset_cur += tuple_byte_size
   }
   if malloc_offset_cur > 0 {
-    self.call_c_conv_aligned(
-      "minimbt_malloc",
-      [Int(malloc_offset_cur)],
-      I(malloc_pointer),
-    )
+    // Just allocate on stack, because we don't use them as call stack
+    self.insert_asm(Addi(Sp, Sp, -malloc_offset_cur))
   }
 
   // 2. generate asms for each inst
@@ -631,7 +618,7 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
           bind,
           fn(reg) {
             reg_tup = reg
-            [Addi(reg, malloc_pointer, malloc_offsets[bind].unwrap())]
+            [Addi(reg, Sp, malloc_offsets[bind].unwrap())]
           },
         )
         // 2. store values into tuple
@@ -642,7 +629,6 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
         }
       }
       KthTuple(bind, tup, offset) => {
-        //println("trying to access \{offset} @  \{tup}")
         let tup_reg = self.pull_val_i(tup)
         match get_reg_ty(Var(bind)) {
           F64 =>
