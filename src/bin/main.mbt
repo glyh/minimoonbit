@@ -1,3 +1,7 @@
+let emit_js : Ref[Bool] = Ref::new(false)
+
+let emit_wasm : Ref[Bool] = Ref::new(false)
+
 /// The stage to be run next.
 enum Stages {
   Parse
@@ -6,6 +10,7 @@ enum Stages {
   Cps
   CloPS
   // NOTE: add stages here.
+  Js
   SsaCfg
   Asm
   Finished
@@ -32,7 +37,8 @@ fn Stages::next(self : Stages) -> Stages {
     Stages::Typecheck => Stages::PreCps
     Stages::PreCps => Stages::Cps
     Stages::Cps => Stages::CloPS
-    Stages::CloPS => Stages::SsaCfg
+    Stages::CloPS => if emit_js.val { Stages::Js } else { Stages::SsaCfg }
+    Stages::Js => Stages::Finished
     Stages::SsaCfg => Stages::Asm
     // NOTE: add stages here.
     Stages::Asm => Stages::Finished
@@ -51,6 +57,7 @@ struct CompileStatus {
   mut cps : @cps.Cps?
   mut clops : @closureps.ClosurePS?
   mut cfg : @ssacfg.SsaCfg?
+  mut js_emitted : String
   // NOTE: add stages here.
   mut asm : Array[@riscv.AssemblyFunction]?
 }
@@ -71,6 +78,7 @@ fn CompileStatus::initialize(
     cps: None,
     clops: None,
     cfg: None,
+    js_emitted: "",
     // NOTE: add stages here.
     asm: None,
   }
@@ -121,6 +129,10 @@ fn CompileStatus::step(self : CompileStatus) -> Bool {
       let cfg = @ssacfg.clops2ssacfg(self.clops.unwrap())
       self.cfg = Some(cfg)
     }
+    Js => {
+      let emitter = @js.JsEmitter::new(self.clops.unwrap())
+      self.js_emitted = emitter.emit()
+    }
     // NOTE: add stages here.
     Asm => {
       let real_asm = @riscv.emit(self.cfg.unwrap())
@@ -137,13 +149,8 @@ fn CompileStatus::output(self : CompileStatus, json : Bool) -> String {
     match self.curr_stage {
       Parse => self.source_code.unwrap()
       Typecheck => @json.stringify(self.ast.unwrap().to_json())
-      PreCps => @util.die("TODO1")
-      Cps => @util.die("TODO2")
-      CloPS => @util.die("TODO999")
-      SsaCfg => @util.die("TODO998")
-      // NOTE: add stages here.
-      Asm => @util.die("TODO3")
       Finished => @riscv.print_functions(self.asm.unwrap())
+      stage => @util.die("Can't make json output of \{stage}")
     }
   } else {
     match self.curr_stage {
@@ -152,10 +159,15 @@ fn CompileStatus::output(self : CompileStatus, json : Bool) -> String {
       PreCps => self.typechecked.unwrap().to_string()
       Cps => self.precps.unwrap().to_string()
       CloPS => self.cps.unwrap().to_string()
-      SsaCfg => self.clops.unwrap().to_string()
+      SsaCfg | Js => self.clops.unwrap().to_string()
       Asm => self.cfg.unwrap().to_string()
       // NOTE: add stages here.
-      Finished => @riscv.print_functions(self.asm.unwrap())
+      Finished =>
+        if emit_js.val {
+          self.js_emitted
+        } else {
+          @riscv.print_functions(self.asm.unwrap())
+        }
     }
   }
 }
@@ -199,6 +211,8 @@ fn main {
         ),
         "End stage",
       ),
+      ("--js", "", @ArgParser.Set(emit_js), "Emits js"),
+      ("--wasm", "", @ArgParser.Set(emit_wasm), "Emits wasm"),
       (
         "--clops-interp",
         "",

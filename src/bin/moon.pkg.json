@@ -11,6 +11,7 @@
       "alias": "types"
     },
     "moonbitlang/minimbt/precps",
+    "moonbitlang/minimbt/js",
     "moonbitlang/minimbt/closureps",
     "moonbitlang/minimbt/ssacfg",
     "moonbitlang/minimbt/cps",

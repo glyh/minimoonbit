@@ -65,8 +65,6 @@ pub enum Cps {
   App(Value, Array[Value])
   // len, elem, continuation
   MakeArray(Value, Value, Value)
-  // TODO: add this to make external call more efficient
-  //ExternCall()
   Exit
 }
 
