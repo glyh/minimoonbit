@@ -52,7 +52,7 @@ fn CloEnv::collect_label_closure(
       self.collect_label_closure(rest, output)
       output.remove(fn_name)
     }
-    If(_, _then, _else) => {
+    If(_, _then, _else) | IfEq(_, _, _then, _else) | IfLe(_, _, _then, _else) => {
       self.collect_label_closure(_then, output)
       self.collect_label_closure(_else, output)
     }
@@ -125,6 +125,8 @@ fn CloEnv::collect_closure(
         self.add_rebind(bind, bind).collect_closure(rest, func_no_free_vars),
       )
     If(_cond, _then, _else) => If(_cond, rec(_then), rec(_else))
+    IfEq(lhs, rhs, _then, _else) => IfEq(lhs, rhs, rec(_then), rec(_else))
+    IfLe(lhs, rhs, _then, _else) => IfLe(lhs, rhs, rec(_then), rec(_else))
     Prim(op, args, bind, rest) =>
       Prim(
         op,

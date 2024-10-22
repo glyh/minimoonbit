@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 
+echo "building CPS IR"
 moon run ../src/bin/main.mbt -- --end-stage cps ./test_src/$1.mbt -o $1.cps
+echo "building CLOPS IR"
 moon run ../src/bin/main.mbt -- --end-stage clops ./test_src/$1.mbt -o $1.clops
+echo "building ASM"
 moon run ../src/bin/main.mbt -- ./test_src/$1.mbt -o $1.s
+echo "building JS"
 moon run ../src/bin/main.mbt -- ./test_src/$1.mbt -o $1.js --js
 
 
+echo "building Binary"
 zig build-exe -target riscv64-linux -femit-bin=$1 \
   $1.s ../riscv_rt/zig-out/lib/libmincaml.a \
   -O Debug -fno-strip -mcpu=baseline_rv64

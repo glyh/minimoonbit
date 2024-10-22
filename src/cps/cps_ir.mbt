@@ -62,6 +62,8 @@ pub enum Cps {
   KthTuple(Int, Value, Var, Cps)
   Fix(Var, Array[Var], Cps, Cps)
   If(Value, Cps, Cps)
+  IfLe(Value, Value, Cps, Cps)
+  IfEq(Value, Value, Cps, Cps)
   Prim(PrimOp, Array[Value], Var, Cps)
   // T marks the return type
   App(Value, Array[Value])
@@ -98,6 +100,10 @@ fn Cps::replace_var_bind(self : Cps, from : Var, to : Value) -> Cps {
       Fix(name, args, body_new, rest_new)
     }
     If(cond, _then, _else) => If(recv(cond), rec(_then), rec(_else))
+    IfEq(lhs, rhs, _then, _else) =>
+      IfEq(recv(lhs), recv(rhs), rec(_then), rec(_else))
+    IfLe(lhs, rhs, _then, _else) =>
+      IfLe(recv(lhs), recv(rhs), rec(_then), rec(_else))
     Prim(op, args, bind, rest) => {
       let rest_new = if from != bind { rec(rest) } else { rest }
       Prim(op, args.map(recv), bind, rest_new)
@@ -138,6 +144,12 @@ pub fn Cps::free_variables(self : Cps) -> @hashset.T[Var] {
     If(cond, _then, _else) =>
       cond
       .free_variables()
+      .union(_then.free_variables())
+      .union(_else.free_variables())
+    IfEq(lhs, rhs, _then, _else) | IfLe(lhs, rhs, _then, _else) =>
+      lhs
+      .free_variables()
+      .union(rhs.free_variables())
       .union(_then.free_variables())
       .union(_else.free_variables())
     Prim(_, args, bind, rest) => {

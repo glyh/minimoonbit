@@ -77,6 +77,8 @@ fn reg_spill_block(blk : @ssacfg.Block, spilled_var : Var) -> @ssacfg.Block {
   }
   let load_before_exit = match blk.last_inst.val {
     Branch(cond, _, _) => val_spilled(cond)
+    BranchEq(lhs, rhs, _, _) | BranchLe(lhs, rhs, _, _) =>
+      val_spilled(lhs) || val_spilled(rhs)
     Call(f, args) => val_spilled(f) || vals_spilled(args)
     MakeArray(len, elem, kont) =>
       val_spilled(len) || val_spilled(elem) || val_spilled(kont)

@@ -25,6 +25,8 @@ pub enum Inst {
 pub enum PCInst {
   // join points (val, block ref)
   Branch(Value, Var, Var)
+  BranchEq(Value, Value, Var, Var)
+  BranchLe(Value, Value, Var, Var)
   Call(Value, Array[Value])
   // len, elem, continuation
   MakeArray(Value, Value, Value)

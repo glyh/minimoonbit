@@ -144,6 +144,62 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
 
       self.precps2cps(tup, c1)
     }
+    If(ret_ty, Prim(Bool, Eq, [lhs, rhs]), _then, _else) => {
+      fn c1(lhs : Value) -> Cps {
+        // To avoid exponential growth in CPS ir, we abstract the outer `c` out.
+        fn c2(rhs : Value) -> Cps {
+          let k_ref = self.new_tmp(Fun([ret_ty], Unit))
+          let x_ref = self.new_tmp(ret_ty)
+          fn c3(branch : Value) -> Cps {
+            App(Var(k_ref), [branch].map(fix_label_to_var))
+          }
+
+          Fix(
+            k_ref,
+            [x_ref],
+            c(Var(x_ref)),
+            IfEq(
+              lhs,
+              rhs,
+              self.precps2cps(_then, c3),
+              self.precps2cps(_else, c3),
+            ),
+          )
+        }
+
+        self.precps2cps(rhs, c2)
+      }
+
+      self.precps2cps(lhs, c1)
+    }
+    If(ret_ty, Prim(Bool, Le, [lhs, rhs]), _then, _else) => {
+      fn c1(lhs : Value) -> Cps {
+        // To avoid exponential growth in CPS ir, we abstract the outer `c` out.
+        fn c2(rhs : Value) -> Cps {
+          let k_ref = self.new_tmp(Fun([ret_ty], Unit))
+          let x_ref = self.new_tmp(ret_ty)
+          fn c3(branch : Value) -> Cps {
+            App(Var(k_ref), [branch].map(fix_label_to_var))
+          }
+
+          Fix(
+            k_ref,
+            [x_ref],
+            c(Var(x_ref)),
+            IfLe(
+              lhs,
+              rhs,
+              self.precps2cps(_then, c3),
+              self.precps2cps(_else, c3),
+            ),
+          )
+        }
+
+        self.precps2cps(rhs, c2)
+      }
+
+      self.precps2cps(lhs, c1)
+    }
     If(ret_ty, cond, _then, _else) => {
       fn c1(cond : Value) -> Cps {
         // To avoid exponential growth in CPS ir, we abstract the outer `c` out.

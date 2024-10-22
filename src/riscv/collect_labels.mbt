@@ -46,6 +46,12 @@ fn collect_externals(cfg : @ssacfg.SsaCfg) -> ExternalLabels {
         collect_label_var(_then)
         collect_label_var(_else)
       }
+      BranchEq(lhs, rhs, _then, _else) | BranchLe(lhs, rhs, _then, _else) => {
+        collect_label_val(lhs)
+        collect_label_val(rhs)
+        collect_label_var(_then)
+        collect_label_var(_else)
+      }
       Call(f, args) => {
         collect_label_val(f)
         args.each(collect_label_val)

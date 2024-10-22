@@ -52,6 +52,44 @@ fn SsaCfg::cps2block(
     }
     Prim(Put, args, _, _) => @util.die("unexpect args \{args} for put")
     Fix(_) => @util.die("unexpected nested function")
+    IfLe(lhs, rhs, _then, _else) => {
+      // NOTE: for control flow connection points there's no reason for us to 
+      // generate a type for it.
+      // NOTE: complete cur block; phis need to be fixed, but we'll deal with it in a later pass 
+      let label_then = self.new_named("then")
+      let label_else = self.new_named("else")
+      cur_block.last_inst.val = BranchLe(lhs, rhs, label_then, label_else)
+      // NOTE: convert then block to ssa block 
+      let block_then = Block::new_from(cur_block.fn_name, cur_label)
+      self.blocks[label_then] = block_then
+      self.cps2block(_then, block_then, label_then)
+      // NOTE: convert else block to ssa block 
+      let block_else = Block::new_from(cur_block.fn_name, cur_label)
+      self.blocks[label_else] = block_else
+      cur_block = block_else
+      cur_label = label_else
+      continue _else
+      // no need to add merge point after if statements as we always have a tail call
+    }
+    IfEq(lhs, rhs, _then, _else) => {
+      // NOTE: for control flow connection points there's no reason for us to 
+      // generate a type for it.
+      // NOTE: complete cur block; phis need to be fixed, but we'll deal with it in a later pass 
+      let label_then = self.new_named("then")
+      let label_else = self.new_named("else")
+      cur_block.last_inst.val = BranchEq(lhs, rhs, label_then, label_else)
+      // NOTE: convert then block to ssa block 
+      let block_then = Block::new_from(cur_block.fn_name, cur_label)
+      self.blocks[label_then] = block_then
+      self.cps2block(_then, block_then, label_then)
+      // NOTE: convert else block to ssa block 
+      let block_else = Block::new_from(cur_block.fn_name, cur_label)
+      self.blocks[label_else] = block_else
+      cur_block = block_else
+      cur_label = label_else
+      continue _else
+      // no need to add merge point after if statements as we always have a tail call
+    }
     If(cond, _then, _else) => {
       // NOTE: for control flow connection points there's no reason for us to 
       // generate a type for it.

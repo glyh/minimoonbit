@@ -21,7 +21,7 @@ fn CloEnv::collect_named_fns(self : CloEnv, c : @cps.Cps) -> Unit {
       self.collect_named_fns(body)
       self.collect_named_fns(rest)
     }
-    If(_, _then, _else) => {
+    If(_, _then, _else) | IfEq(_, _, _then, _else) | IfLe(_, _, _then, _else) => {
       self.collect_named_fns(_then)
       self.collect_named_fns(_else)
     }

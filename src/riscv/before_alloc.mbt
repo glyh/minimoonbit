@@ -28,6 +28,39 @@ fn reserve_fregs(cfg : @ssacfg.SsaCfg, block : @ssacfg.Block) -> Unit {
       inst => insts.push(inst)
     }
   }
+  match block.last_inst.val {
+    BranchEq(lhs, rhs, _then, _else) => {
+      let lhs_is_imm = match lhs {
+        Var(_) => false
+        _ => true
+      }
+      let rhs_is_imm = match rhs {
+        Var(_) => false
+        _ => true
+      }
+      if lhs_is_imm && rhs_is_imm {
+        let tmp = cfg.new_named("tmp", ty=lhs.get_type())
+        insts.push(@ssacfg.Inst::Copy(tmp, lhs))
+        block.last_inst.val = BranchEq(Var(tmp), rhs, _then, _else)
+      }
+    }
+    BranchLe(lhs, rhs, _then, _else) => {
+      let lhs_is_imm = match lhs {
+        Var(_) => false
+        _ => true
+      }
+      let rhs_is_imm = match rhs {
+        Var(_) => false
+        _ => true
+      }
+      if lhs_is_imm && rhs_is_imm {
+        let tmp = cfg.new_named("tmp", ty=lhs.get_type())
+        insts.push(@ssacfg.Inst::Copy(tmp, lhs))
+        block.last_inst.val = BranchLe(Var(tmp), rhs, _then, _else)
+      }
+    }
+    _ => ()
+  }
   block.insts = insts
 }
 
@@ -63,10 +96,11 @@ fn freeze_closure(
   }
   block.insts = insts
   block.last_inst.val = match block.last_inst.val {
-    Branch(cond, _then, _else) => Branch(fix_val(cond), _then, _else)
+    Branch(cond, _then, _else) => Branch(cond, _then, _else)
+    BranchEq(lhs, rhs, _then, _else) => BranchEq(lhs, rhs, _then, _else)
+    BranchLe(lhs, rhs, _then, _else) => BranchLe(lhs, rhs, _then, _else)
     Call(f, args) => Call(fix_val(f), args.map(fix_val))
-    MakeArray(len, elem, kont) =>
-      MakeArray(fix_val(len), fix_val(elem), fix_val(kont))
+    MakeArray(len, elem, kont) => MakeArray(len, fix_val(elem), fix_val(kont))
     Exit => Exit
   }
 }

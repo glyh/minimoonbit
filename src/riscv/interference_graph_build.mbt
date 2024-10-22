@@ -79,6 +79,10 @@ fn LiveVarAnalysis::collect_pc_inst(
 ) -> Unit {
   match inst {
     Branch(cond, _then, _else) => self.collect_val(cond)
+    BranchEq(lhs, rhs, _then, _else) | BranchLe(lhs, rhs, _then, _else) => {
+      self.collect_val(lhs)
+      self.collect_val(rhs)
+    }
     Call(f, args) => {
       self.collect_val(f)
       args.each(fn(arg) { self.collect_val(arg) })
@@ -127,7 +131,9 @@ fn collect_blocks_of_fn(cfg : @ssacfg.SsaCfg, fn_name : Var) -> Array[Var] {
       let cur_blk = cfg.blocks[label].unwrap()
       stack_process.push(label)
       match cur_blk.last_inst.val {
-        Branch(_, blk_then, blk_else) => {
+        Branch(_, blk_then, blk_else)
+        | BranchEq(_, _, blk_then, blk_else)
+        | BranchLe(_, _, blk_then, blk_else) => {
           q_collect.push(blk_then)
           q_collect.push(blk_else)
         }

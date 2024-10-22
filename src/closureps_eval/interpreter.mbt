@@ -172,6 +172,17 @@ pub fn CloPSInterpreter::eval(
         Bool(b) => continue if b { _then } else { _else }
         v => @util.die("unexpected condition \{v} for `if`")
       }
+    IfLe(lhs, rhs, _then, _else) =>
+      match (self.eval_v!(lhs), self.eval_v!(rhs)) {
+        (Double(a), Double(b)) => continue if a <= b { _then } else { _else }
+        (Int(a), Int(b)) => continue if a <= b { _then } else { _else }
+        (lhs, rhs) => @util.die("unexpected input \{lhs}, \{rhs} for `le`")
+      }
+    IfEq(lhs, rhs, _then, _else) => {
+      let lhs = self.eval_v!(lhs)
+      let rhs = self.eval_v!(rhs)
+      continue if lhs == rhs { _then } else { _else }
+    }
     Prim(Not, [v], bind, rest) => {
       match self.eval_v!(v) {
         Bool(b) => self.cur_env[bind] = Bool(not(b))

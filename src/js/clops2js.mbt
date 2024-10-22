@@ -73,6 +73,24 @@ pub fn JsEmitter::emit_cps(self : JsEmitter, cps : @cps.Cps) -> String {
       output += self.indent().emit_cps(_else)
       output += line_start + "}"
     }
+    IfEq(lhs, rhs, _then, _else) => {
+      let lhs_emit = self.emit_val(lhs)
+      let rhs_emit = self.emit_val(rhs)
+      output += line_start + "if (\{lhs_emit} === \{rhs_emit}) {"
+      output += self.indent().emit_cps(_then)
+      output += line_start + "} else { "
+      output += self.indent().emit_cps(_else)
+      output += line_start + "}"
+    }
+    IfLe(lhs, rhs, _then, _else) => {
+      let lhs_emit = self.emit_val(lhs)
+      let rhs_emit = self.emit_val(rhs)
+      output += line_start + "if (\{lhs_emit} <= \{rhs_emit}) {"
+      output += self.indent().emit_cps(_then)
+      output += line_start + "} else { "
+      output += self.indent().emit_cps(_else)
+      output += line_start + "}"
+    }
     Prim(Not, [b], bind, rest) => {
       let bool_emit = self.emit_val(b)
       output += line_start + "const \{emit_var(bind)} = !\{bool_emit};"

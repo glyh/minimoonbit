@@ -854,6 +854,88 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
       )
       self.branch_to(blk_else).codegen()
     }
+    BranchEq(lhs, rhs, blk_then, blk_else) =>
+      match get_reg_ty(lhs) {
+        // TODO: just like Eq & Le, we need to ensure the 2 regs doesn't crash
+        F64 => {
+          let reg_lhs = self.pull_val_f(lhs)
+          let reg_rhs = self.pull_val_f(rhs)
+          // NOTE: since we've reserve freg first, this won't happen
+          if reg_lhs == reg_rhs {
+            @util.die("pulling same reg for comparing floats")
+          }
+          self.insert_asms(
+            [
+              FeqD(reg_swap, reg_lhs, reg_rhs),
+              Beq(reg_swap, Zero, blk_else.to_string()),
+            ],
+          )
+          self.branch_to(blk_then).codegen()
+          self.insert_asm(
+            Comment(
+              "we have tail call so no point generating a jump to skip the else branch",
+            ),
+          )
+          self.branch_to(blk_else).codegen()
+        }
+        _ => {
+          let reg_lhs = self.pull_val_i(lhs)
+          let reg_rhs = self.pull_val_i(rhs)
+          // NOTE: since we've reserve freg first, this won't happen
+          if reg_lhs == reg_rhs {
+            @util.die("pulling same reg for comparing floats")
+          }
+          self.insert_asm(Bne(reg_lhs, reg_rhs, blk_else.to_string()))
+          self.branch_to(blk_then).codegen()
+          self.insert_asm(
+            Comment(
+              "we have tail call so no point generating a jump to skip the else branch",
+            ),
+          )
+          self.branch_to(blk_else).codegen()
+        }
+      }
+    BranchLe(lhs, rhs, blk_then, blk_else) =>
+      match get_reg_ty(lhs) {
+        // TODO: just like Eq & Le, we need to ensure the 2 regs doesn't crash
+        F64 => {
+          let reg_lhs = self.pull_val_f(lhs)
+          let reg_rhs = self.pull_val_f(rhs)
+          // NOTE: since we've reserve freg first, this won't happen
+          if reg_lhs == reg_rhs {
+            @util.die("pulling same reg for comparing floats")
+          }
+          self.insert_asms(
+            [
+              FleD(reg_swap, reg_lhs, reg_rhs),
+              Beq(reg_swap, Zero, blk_else.to_string()),
+            ],
+          )
+          self.branch_to(blk_then).codegen()
+          self.insert_asm(
+            Comment(
+              "we have tail call so no point generating a jump to skip the else branch",
+            ),
+          )
+          self.branch_to(blk_else).codegen()
+        }
+        _ => {
+          let reg_lhs = self.pull_val_i(lhs)
+          let reg_rhs = self.pull_val_i(rhs)
+          // NOTE: since we've reserve freg first, this won't happen
+          if reg_lhs == reg_rhs {
+            @util.die("pulling same reg for comparing floats")
+          }
+          self.insert_asm(Bgt(reg_lhs, reg_rhs, blk_else.to_string()))
+          self.branch_to(blk_then).codegen()
+          self.insert_asm(
+            Comment(
+              "we have tail call so no point generating a jump to skip the else branch",
+            ),
+          )
+          self.branch_to(blk_else).codegen()
+        }
+      }
     Exit => self.insert_asms([Li(A0, "0"), Li(A7, "93"), Ecall])
     MakeArray(len, elem, continuation) => {
       // 1. call to generate an array

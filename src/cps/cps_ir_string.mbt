@@ -49,6 +49,28 @@ fn to_str(cps : Cps, ~ident : String = "") -> String {
       ident +
       "}\n" +
       rec(rest)
+    IfEq(lhs, rhs, _then, _else) =>
+      ident +
+      "if(\{lhs} == \{rhs}){\n" +
+      to_str(_then, ident=ident + "  ") +
+      "\n" +
+      ident +
+      "} else {\n" +
+      to_str(_else, ident=ident + "  ") +
+      "\n" +
+      ident +
+      "}"
+    IfLe(lhs, rhs, _then, _else) =>
+      ident +
+      "if(\{lhs} <= \{rhs}){\n" +
+      to_str(_then, ident=ident + "  ") +
+      "\n" +
+      ident +
+      "} else {\n" +
+      to_str(_else, ident=ident + "  ") +
+      "\n" +
+      ident +
+      "}"
     If(cond, _then, _else) =>
       ident +
       "if(\{cond}){\n" +
