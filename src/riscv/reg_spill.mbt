@@ -54,6 +54,15 @@ fn reg_spill_block(blk : @ssacfg.Block, spilled_var : Var) -> @ssacfg.Block {
           insts_new.push(Store(spilled_var))
         }
       }
+      Copy(bind, copied) => {
+        if val_spilled(copied) {
+          insts_new.push(Load(spilled_var))
+        }
+        insts_new.push(inst)
+        if bind == spilled_var {
+          insts_new.push(Store(spilled_var))
+        }
+      }
       Prim(bind, _, args) => {
         if vals_spilled(args) {
           insts_new.push(Load(spilled_var))

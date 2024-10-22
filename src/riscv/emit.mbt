@@ -3,15 +3,13 @@ let heap_ptr_label : Ref[String] = { val: "" }
 let stub_label : Ref[String] = { val: "" }
 
 pub fn emit(cfg : @ssacfg.SsaCfg) -> Array[AssemblyFunction] {
+  let cfg = reserve_freg(cfg)
   let output = []
-  heap_ptr_label.val = "heap_\{cfg.counter}"
+  heap_ptr_label.val = cfg.new_named("heap").to_string()
 
   // generate stub for CPS / C-Calling convention interop
-  cfg.counter += 1
-  stub_label.val = "c_stub_\{cfg.counter}"
-  cfg.counter += 1
-  let stub_resolved_i = "c_stub_resolved_i_\{cfg.counter}"
-  cfg.counter += 1
+  stub_label.val = cfg.new_named("c_stub").to_string()
+  let stub_resolved_i = cfg.new_named("c_stub_resolved_i").to_string()
   let body : Array[RvAsm] = []
   let externals = collect_externals(cfg)
   // generate stubs for function returning ints
@@ -58,8 +56,7 @@ pub fn emit(cfg : @ssacfg.SsaCfg) -> Array[AssemblyFunction] {
     ],
   )
   // generates stub for function returning floats
-  let stub_resolved_f = "c_stub_resolved_f_\{cfg.counter}"
-  cfg.counter += 1
+  let stub_resolved_f = cfg.new_named("c_stub_resolved_f").to_string()
   for external in externals.returns_f {
     guard let @typing.Type::Fun(args, _) = external.ty.val else {
       _ => @util.die("external non function \{external}")

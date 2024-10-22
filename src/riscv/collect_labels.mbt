@@ -33,7 +33,7 @@ fn collect_externals(cfg : @ssacfg.SsaCfg) -> ExternalLabels {
           collect_label_var(bind)
           vals.each(collect_label_val)
         }
-        KthTuple(bind, val, _) => {
+        KthTuple(bind, val, _) | Copy(bind, val) => {
           collect_label_var(bind)
           collect_label_val(val)
         }

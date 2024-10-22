@@ -105,6 +105,10 @@ fn LiveVarAnalysis::collect_inst(
       self.var_set.remove(bind)
       self.collect_val(tup)
     }
+    Copy(bind, copied) => {
+      self.var_set.remove(bind)
+      self.collect_val(copied)
+    }
     Prim(bind, _, args) => {
       self.var_set.remove(bind)
       args.each(fn(v) { self.collect_val(v) })

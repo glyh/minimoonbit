@@ -10,14 +10,16 @@ pub enum PrimOp {
 } derive(Show)
 
 pub enum Inst {
-  // cps ir
+  // Cps IR
   MakeTuple(Var, Array[Value])
   KthTuple(Var, Value, Int)
-  // primitives
+  // Primitives
   Prim(Var, PrimOp, Array[Value])
-  // for reg allocation spilling
+  // For reg allocation spilling
   Store(Var)
   Load(Var)
+  // So we can deal with the case where 1 tmp reg is not enough
+  Copy(Var, Value)
 } derive(Show)
 
 pub enum PCInst {
@@ -32,7 +34,7 @@ pub enum PCInst {
 pub struct Block {
   from : Var?
   fn_name : Var // for TCO
-  insts : Array[Inst]
+  mut insts : Array[Inst] //
   last_inst : Ref[PCInst]
 } derive(Show)
 
@@ -63,7 +65,7 @@ fn SsaCfg::new_fn_block(
   { fn_name, from: None, insts: [], last_inst: { val: Exit } }
 }
 
-fn SsaCfg::new_named(
+pub fn SsaCfg::new_named(
   self : SsaCfg,
   name : String,
   ~ty : @typing.Type = Unit
