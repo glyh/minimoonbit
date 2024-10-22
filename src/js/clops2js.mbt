@@ -149,7 +149,7 @@ pub fn JsEmitter::emit_cps(self : JsEmitter, cps : @cps.Cps) -> String {
 }
 
 pub fn JsEmitter::emit(self : JsEmitter) -> String {
-  let mut output = "compiled_functions = ["
+  let mut output = "const compiled_functions = ["
   let line_start = "\n  "
 
   // 1. emit root
@@ -171,15 +171,17 @@ pub fn JsEmitter::emit(self : JsEmitter) -> String {
   }
   output += "\n];\n\n"
   output +=
-    #|let current_cont = [0, []]
-    #|while(true) {
-    #|  const [cont_or_external, args] = current_cont
-    #|  if (typeof cont_or_external === "number") { // not external
-    #|    current_cont = compiled_functions[cont_or_external](...args)
-    #|  } else { // external
-    #|    const cont = args.pop()
-    #|    const result = cont_or_external(...args)
-    #|    current_cont = [cont[0], [result, cont]]
+    #|export default function () {
+    #|  let current_cont = [0, []]
+    #|  while(true) {
+    #|    const [cont_or_external, args] = current_cont
+    #|    if (typeof cont_or_external === "number") { // not external
+    #|      current_cont = compiled_functions[cont_or_external](...args)
+    #|    } else { // external
+    #|      const cont = args.pop()
+    #|      const result = cont_or_external(...args)
+    #|      current_cont = [cont[0], [result, cont]]
+    #|    }
     #|  }
     #|}
   output
