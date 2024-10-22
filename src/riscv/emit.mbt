@@ -10,11 +10,12 @@ pub fn emit(cfg : @ssacfg.SsaCfg) -> Array[AssemblyFunction] {
   cfg.counter += 1
   stub_label.val = "c_stub_\{cfg.counter}"
   cfg.counter += 1
-  let stub_resolved = "c_stub_resolved_\{cfg.counter}"
+  let stub_resolved_i = "c_stub_resolved_i_\{cfg.counter}"
   cfg.counter += 1
   let body : Array[RvAsm] = []
-  //println(collect_externals(cfg))
-  for external in collect_externals(cfg) {
+  let externals = collect_externals(cfg)
+  // generate stubs for function returning ints
+  for external in externals.returns_i {
     guard let @typing.Type::Fun(args, _) = external.ty.val else {
       _ => @util.die("external non function \{external}")
     }
@@ -35,7 +36,7 @@ pub fn emit(cfg : @ssacfg.SsaCfg) -> Array[AssemblyFunction] {
       [
         Comment("store the register holding continuation"),
         Mv(S1, kont_reg),
-        J(stub_resolved),
+        J(stub_resolved_i),
       ],
     )
   }
@@ -45,11 +46,56 @@ pub fn emit(cfg : @ssacfg.SsaCfg) -> Array[AssemblyFunction] {
   // to a2(where we store continuaion) and then call the continuation
   body.append(
     [
-      Label(stub_resolved),
+      Label(stub_resolved_i),
       Comment("call the external function"),
       Jalr(T6),
-      Comment("put continuation as 2nd arg"),
+      Comment("A0 holds result, put continuation as 2nd arg"),
       Mv(A1, S1),
+      Comment("fetch continuation address"),
+      Ld(T1, { base: S1, offset: 0 }),
+      Comment("call continuation"),
+      Jr(T1),
+    ],
+  )
+  // generates stub for function returning floats
+  let stub_resolved_f = "c_stub_resolved_f_\{cfg.counter}"
+  cfg.counter += 1
+  for external in externals.returns_f {
+    guard let @typing.Type::Fun(args, _) = external.ty.val else {
+      _ => @util.die("external non function \{external}")
+    }
+    let fn_name = external.to_string()
+    body.append([Label(fn_name), La(T6, Label("minimbt_" + fn_name))])
+    let int_arg_cnt = args.iter().filter(fn(arg) { arg != Double }).count()
+    let kont_reg = match int_arg_cnt {
+      0 => A0
+      1 => A1
+      2 => A2
+      3 => A3
+      4 => A4
+      5 => A5
+      _ => @util.die("too many args for external call")
+    }
+    // we never return so it's safe to modify the stored regs without backing up
+    body.append(
+      [
+        Comment("store the register holding continuation"),
+        Mv(S1, kont_reg),
+        J(stub_resolved_f),
+      ],
+    )
+  }
+  // now in swap reg stores our target function's address
+  // S1 stores the continuation
+  // we just need to first call the target function, then move closure pointer 
+  // to a2(where we store continuaion) and then call the continuation
+  body.append(
+    [
+      Label(stub_resolved_f),
+      Comment("call the external function"),
+      Jalr(T6),
+      Comment("Fa0 holds result, put continuation as 2nd arg"),
+      Mv(A0, S1),
       Comment("fetch continuation address"),
       Ld(T1, { base: S1, offset: 0 }),
       Comment("call continuation"),

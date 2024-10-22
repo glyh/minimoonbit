@@ -1,9 +1,19 @@
-fn collect_externals(cfg : @ssacfg.SsaCfg) -> @hashset.T[Var] {
-  let out : @hashset.T[Var] = @hashset.new()
+struct ExternalLabels {
+  returns_i : @hashset.T[Var]
+  returns_f : @hashset.T[Var]
+}
+
+fn collect_externals(cfg : @ssacfg.SsaCfg) -> ExternalLabels {
+  let out = { returns_i: @hashset.new(), returns_f: @hashset.new() }
   fn collect_label_var(v : Var) {
     if v.id < 0 {
-      out.insert(v)
-      //println("adding \{v}, now: \{out}")
+      guard let Fun(_, ret) = v.ty.val else {
+        _ => @util.die("unexpected non function external: \{v}")
+      }
+      match ret {
+        Double => out.returns_f.insert(v)
+        _ => out.returns_i.insert(v)
+      }
     }
   }
 
