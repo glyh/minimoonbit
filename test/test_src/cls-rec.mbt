@@ -1,4 +1,4 @@
-let x: Int = 10;
+let x: Int = 9 + 1;
 
 fn f(y: Int) -> Int {
   if y == 0 {

@@ -8,33 +8,66 @@ fn CloEnv::rebind_var(self : CloEnv, v : Var) -> Var {
 
 fn CloEnv::rebind_value(self : CloEnv, v : Value) -> Value {
   match v {
-    Var(v) => Var(self.rebind_var(v))
-    Label(l) => Label(self.rebind_var(l))
+    Var(l) | Label(l) =>
+      match self.bindings[l] {
+        None => v
+        Some(wrapped) => Var(wrapped)
+      }
     v => v
   }
 }
 
-fn CloEnv::collect_label_closure(self : CloEnv, s : S) -> @hashset.T[Var] {
+fn CloEnv::collect_label_closure_val(
+  self : CloEnv,
+  v : Value,
+  output : @hashset.T[Var]
+) -> Unit {
+  guard let Label(l) = v else { _ => return  }
+  if self.named_fns.contains(l) {
+    output.insert(l)
+  }
+}
+
+fn CloEnv::collect_label_closure_vals(
+  self : CloEnv,
+  vs : Array[Value],
+  output : @hashset.T[Var]
+) -> Unit {
+  vs.each(fn(v) { self.collect_label_closure_val(v, output) })
+}
+
+fn CloEnv::collect_label_closure(
+  self : CloEnv,
+  s : S,
+  output : @hashset.T[Var]
+) -> Unit {
   match s {
-    Prim(_, _, _, rest) | Tuple(_, _, rest) | KthTuple(_, _, _, rest) =>
-      self.collect_label_closure(rest)
+    Prim(_, vals, _, rest) | Tuple(vals, _, rest) => {
+      self.collect_label_closure_vals(vals, output)
+      self.collect_label_closure(rest, output)
+    }
+    KthTuple(_, _, _, rest) => self.collect_label_closure(rest, output)
     Fix(fn_name, _, body, rest) => {
-      let collected = self
-        .collect_label_closure(body)
-        .union(self.collect_label_closure(rest))
-      collected.remove(fn_name)
-      collected
+      self.collect_label_closure(body, output)
+      self.collect_label_closure(rest, output)
+      output.remove(fn_name)
     }
-    If(_, _then, _else) =>
-      self.collect_label_closure(_then).union(self.collect_label_closure(_else))
-    App(f, _) => {
-      guard let Label(label) = f else { _ => return @hashset.new() }
-      if label.id < 0 {
-        return @hashset.new()
+    If(_, _then, _else) => {
+      self.collect_label_closure(_then, output)
+      self.collect_label_closure(_else, output)
+    }
+    App(f, args) => {
+      self.collect_label_closure_vals(args, output)
+      guard let Label(label) = f else { _ => return  }
+      if label.id > 0 {
+        output.insert(label)
       }
-      @hashset.of([label])
     }
-    MakeArray(_, _, _) | Exit => @hashset.new()
+    MakeArray(_, elem, cont) => {
+      self.collect_label_closure_val(elem, output)
+      self.collect_label_closure_val(cont, output)
+    }
+    Exit => ()
   }
 }
 
@@ -89,9 +122,9 @@ fn CloEnv::collect_closure(self : CloEnv, s : S) -> S {
       // Step 1. Collect free variables to generate free_var & closure
       // NOTE: For unknown functions, we still need to pass them a closure
       // and that param might be free. so we may need to add that as well.
-      let free_vars = self
-        .collect_label_closure(body)
-        .union(body.free_variables())
+      let free_vars_set = body.free_variables()
+      self.collect_label_closure(body, free_vars_set)
+      let free_vars = free_vars_set
         .iter()
         .filter(fn(v) { v != f && not(args.contains(v)) })
         .map(
@@ -130,9 +163,6 @@ fn CloEnv::collect_closure(self : CloEnv, s : S) -> S {
       let body_env = args
         .fold(init=self, fn(acc, ele) { acc.add_rebind(ele, ele) })
         .add_rebind(f, closure)
-      //if f.id == 1 {
-      //  println(body_env.bindings)
-      //}
       body_new = body_env.collect_closure(body_new)
 
       // Step 3. fill this function to fnblocks
@@ -140,9 +170,6 @@ fn CloEnv::collect_closure(self : CloEnv, s : S) -> S {
 
       // Step 4. recurse on rest
       let rest_fixed_inner = self.add_rebind(f, closure).collect_closure(rest)
-      //println(
-      //  "for \{f} we generated a closure of type \{closure_ty} on \{closure}",
-      //)
       if has_free_vars {
         let freevars_captured = self.new_named("fvs_cap", free_var_tup_ty)
         Tuple(
@@ -163,7 +190,7 @@ fn CloEnv::collect_closure(self : CloEnv, s : S) -> S {
         Some(closure) =>
           // NOTE: delay the generation of platform-specific code to later phase
           // This is because the convention for js and riscv is different 
-          MakeArray(len, elem, Var(closure))
+          MakeArray(len, recrbva(elem), recrbva(Var(closure)))
         None =>
           @util.die("undefined continuation \{kont} called after making array")
       }

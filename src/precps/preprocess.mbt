@@ -17,6 +17,8 @@ pub fn inline_entry(
       let has_init = has_init || f.name.0 == "init"
       LetRec(f, inline_entry(rest, ~has_main, ~has_init))
     }
+    Let(name, val, rest) =>
+      Let(name, val, inline_entry(rest, ~has_main, ~has_init))
     s => @util.die("unexpected toplevel \{s}")
   }
 }
