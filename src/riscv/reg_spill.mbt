@@ -72,7 +72,7 @@ fn reg_spill_block(blk : @ssacfg.Block, spilled_var : Var) -> @ssacfg.Block {
           insts_new.push(Store(spilled_var))
         }
       }
-      LoadAddr(_) | Load(_) | Store(_) => insts_new.push(inst)
+      Load(_) | Store(_) => insts_new.push(inst)
     }
   }
   let load_before_exit = match blk.last_inst.val {

@@ -598,7 +598,6 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
   for inst in block.insts {
     self.insert_asm(Comment(inst.to_string()))
     match inst {
-      LoadAddr(var, addr) => self.assign_i(var, fn(reg) { [La(reg, addr)] })
       Copy(bind, copied) =>
         match get_reg_ty(copied) {
           F64 => {

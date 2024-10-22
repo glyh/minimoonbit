@@ -38,7 +38,6 @@ fn collect_externals(cfg : @ssacfg.SsaCfg) -> ExternalLabels {
           collect_label_val(val)
         }
         Store(var) | Load(var) => collect_label_var(var)
-        LoadAddr(_) => () // load addr can't be external
       }
     }
     match blk.last_inst.val {

@@ -20,8 +20,6 @@ pub enum Inst {
   Load(Var)
   // So we can deal with the case where 1 tmp reg is not enough
   Copy(Var, Value)
-  // Support for constant closure 
-  LoadAddr(Var, String)
 } derive(Show)
 
 pub enum PCInst {

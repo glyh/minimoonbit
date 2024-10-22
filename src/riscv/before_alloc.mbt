@@ -31,51 +31,44 @@ fn reserve_fregs(cfg : @ssacfg.SsaCfg, block : @ssacfg.Block) -> Unit {
   block.insts = insts
 }
 
-// NOTE: load constant closure into scope whenever it's needed
-fn ensure_closure_load(
+// NOTE: replace constant closure with labels
+fn freeze_closure(
   all_constant_closures : @hashset.T[Var],
   block : @ssacfg.Block
 ) -> Unit {
   let insts_backup = block.insts
   let insts : Array[@ssacfg.Inst] = []
-  let defined_constant_closure : @hashset.T[Var] = @hashset.new()
-  fn check_constant_closure_val(v : Value) {
+  fn fix_val(v : Value) -> Value {
     match v {
       Var(v) =>
-        if all_constant_closures.contains(v) &&
-          not(defined_constant_closure.contains(v)) {
-          insts.push(LoadAddr(v, v.to_string()))
-          defined_constant_closure.insert(v)
+        if all_constant_closures.contains(v) {
+          Label(v)
+        } else {
+          Var(v)
         }
-      _ => ()
+      _ => v
     }
   }
 
   for inst in insts_backup {
-    match inst {
-      MakeTuple(bind, vals) => {
-        vals.each(check_constant_closure_val)
-        defined_constant_closure.insert(bind)
-      }
-      KthTuple(bind, tup, _) => {
-        check_constant_closure_val(tup)
-        defined_constant_closure.insert(bind)
-      }
-      Prim(bind, _, args) => {
-        args.each(check_constant_closure_val)
-        defined_constant_closure.insert(bind)
-      }
+    let inst : @ssacfg.Inst = match inst {
+      MakeTuple(bind, vals) => MakeTuple(bind, vals.map(fix_val))
+      KthTuple(bind, tup, k) => KthTuple(bind, fix_val(tup), k)
+      Prim(bind, op, args) => Prim(bind, op, args.map(fix_val))
       Store(_) | Load(_) =>
         @util.die("unreachable: load/store occurs before allocation")
-      Copy(bind, copied) => {
-        check_constant_closure_val(copied)
-        defined_constant_closure.insert(bind)
-      }
-      LoadAddr(bind, _) => defined_constant_closure.insert(bind)
+      Copy(bind, copied) => Copy(bind, fix_val(copied))
     }
     insts.push(inst)
   }
   block.insts = insts
+  block.last_inst.val = match block.last_inst.val {
+    Branch(cond, _then, _else) => Branch(fix_val(cond), _then, _else)
+    Call(f, args) => Call(fix_val(f), args.map(fix_val))
+    MakeArray(len, elem, kont) =>
+      MakeArray(fix_val(len), fix_val(elem), fix_val(kont))
+    Exit => Exit
+  }
 }
 
 fn before_alloc(cfg : @ssacfg.SsaCfg) -> @ssacfg.SsaCfg {
@@ -87,7 +80,7 @@ fn before_alloc(cfg : @ssacfg.SsaCfg) -> @ssacfg.SsaCfg {
   for item in cfg.blocks {
     let (_, block) = item
     reserve_fregs(cfg, block)
-    ensure_closure_load(all_constant_closures, block)
+    freeze_closure(all_constant_closures, block)
   }
   cfg
 }
