@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-
-moon run ../src/bin/main.mbt -- $1 -o $2

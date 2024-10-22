@@ -3,6 +3,7 @@ pub enum Value {
   Int(Int)
   Double(Double)
   Tuple(Array[Value])
+  Bool(Bool)
   Label(Var)
   Array(Array[Value])
   ExternFn(String)
@@ -90,6 +91,7 @@ fn CloPSInterpreter::eval_v(
     Unit => Unit
     Int(i) => Int(i)
     Double(f) => Double(f)
+    Bool(b) => Bool(b)
   }
 }
 
@@ -160,13 +162,12 @@ pub fn CloPSInterpreter::eval(
       @util.die("Unexpected non-top level function definiton \{f}")
     If(cond, _then, _else) =>
       match self.eval_v!(cond) {
-        Int(1) => continue _then
-        _ => continue _else
+        Bool(b) => continue if b { _then } else { _else }
+        v => @util.die("unexpected condition \{v} for `if`")
       }
     Prim(Not, [v], bind, rest) => {
       match self.eval_v!(v) {
-        Int(1) => self.cur_env[bind] = Int(0)
-        Int(0) => self.cur_env[bind] = Int(1)
+        Bool(b) => self.cur_env[bind] = Bool(not(b))
         v => @util.die("unexpected input \{v} for `not`")
       }
       continue rest
@@ -238,14 +239,13 @@ pub fn CloPSInterpreter::eval(
     Prim(Eq, [lhs, rhs], bind, rest) => {
       let lhs = self.eval_v!(lhs)
       let rhs = self.eval_v!(rhs)
-      self.cur_env[bind] = Int(if lhs == rhs { 1 } else { 0 })
+      self.cur_env[bind] = Bool(lhs == rhs)
       continue rest
     }
     Prim(Le, [lhs, rhs], bind, rest) => {
       match (self.eval_v!(lhs), self.eval_v!(rhs)) {
-        (Double(a), Double(b)) =>
-          self.cur_env[bind] = Int(if a <= b { 1 } else { 0 })
-        (Int(a), Int(b)) => self.cur_env[bind] = Int(if a <= b { 1 } else { 0 })
+        (Double(a), Double(b)) => self.cur_env[bind] = Bool(a <= b)
+        (Int(a), Int(b)) => self.cur_env[bind] = Bool(a <= b)
         (lhs, rhs) => @util.die("unexpected input \{lhs}, \{rhs} for `le`")
       }
       continue rest

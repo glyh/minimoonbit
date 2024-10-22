@@ -2,12 +2,12 @@
 // PreCPS IR different from typed AST in that:
 // 1. all expression carries a type, or can be have it's type inferred without 
 // an associated type enviornment 
-// 2. Booleans are desugarred into ints.
-// 3. All variables that refers to the same object has a same unique ID.
+// 2. All variables that refers to the same object has a same unique ID.
 pub enum PreCps {
   Unit
   Int(Int)
   Double(Double)
+  Bool(Bool)
   // T marks the binding type
   LetRec(T, Var, Array[Var], PreCps, PreCps)
   Let(T, Var, PreCps, PreCps)
@@ -29,6 +29,7 @@ pub fn PreCps::to_string(self : PreCps) -> String {
   match self {
     Unit => "()"
     Int(i) => i.to_string()
+    Bool(b) => b.to_string()
     Double(f) => f.to_string()
     LetRec(_, name, args, body, rest) =>
       "letrec \{name}(\{args}){\{body}} in \{rest}"
@@ -49,6 +50,7 @@ pub fn PreCps::get_type(self : PreCps) -> T {
     Unit => Unit
     Int(_) => Int
     Double(_) => Double
+    Bool(_) => Bool
     LetRec(_, _, _, _, inner) => inner.get_type()
     Let(_, _, _, inner) => inner.get_type()
     Var(t, _)

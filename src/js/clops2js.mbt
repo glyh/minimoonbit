@@ -33,6 +33,7 @@ pub fn JsEmitter::emit_val(self : JsEmitter, val : @cps.Value) -> String {
       }
     Unit => "0"
     Int(i) => i.to_string()
+    Bool(b) => b.to_string()
     Double(f) => f.to_string()
   }
 }
@@ -74,7 +75,7 @@ pub fn JsEmitter::emit_cps(self : JsEmitter, cps : @cps.Cps) -> String {
     }
     Prim(Not, [b], bind, rest) => {
       let bool_emit = self.emit_val(b)
-      output += line_start + "const \{emit_var(bind)} = 1 - \{bool_emit};"
+      output += line_start + "const \{emit_var(bind)} = !\{bool_emit};"
       continue rest
     }
     Prim(Neg(_), [num], bind, rest) => {
@@ -120,14 +121,14 @@ pub fn JsEmitter::emit_cps(self : JsEmitter, cps : @cps.Cps) -> String {
       let lhs_emit = self.emit_val(lhs)
       let rhs_emit = self.emit_val(rhs)
       output += line_start +
-        "const \{emit_var(bind)} = \{lhs_emit} === \{rhs_emit} ? 1 : 0;"
+        "const \{emit_var(bind)} = \{lhs_emit} === \{rhs_emit};"
       continue rest
     }
     Prim(Le, [lhs, rhs], bind, rest) => {
       let lhs_emit = self.emit_val(lhs)
       let rhs_emit = self.emit_val(rhs)
       output += line_start +
-        "const \{emit_var(bind)} = \{lhs_emit} <= \{rhs_emit} ? 1 : 0;"
+        "const \{emit_var(bind)} = \{lhs_emit} <= \{rhs_emit};"
       continue rest
     }
     Prim(_) as expr => @util.die("malformed prim call \{expr}")
@@ -153,7 +154,7 @@ pub fn JsEmitter::emit(self : JsEmitter) -> String {
   let line_start = "\n  "
 
   // 1. emit root
-  output += line_start + "function() {"
+  output += line_start + "function() { // root"
   output += self.indent().indent().emit_cps(self.clops.root)
   output += line_start + "},"
 
@@ -164,7 +165,8 @@ pub fn JsEmitter::emit(self : JsEmitter) -> String {
     let args_with_closure = cur_fn.args.copy()
     args_with_closure.push(cur_fn.closure)
     let args_with_closure_emitted = args_with_closure.map(emit_var).join(", ")
-    output += line_start + "function(\{args_with_closure_emitted}) {"
+    output += line_start +
+      "function(\{args_with_closure_emitted}) { // \{label}"
     // i. emit body
     output += self.indent().indent().emit_cps(cur_fn.body)
     output += line_start + "},"
@@ -172,15 +174,15 @@ pub fn JsEmitter::emit(self : JsEmitter) -> String {
   output += "\n];\n\n"
   output +=
     #|export default function () {
-    #|  let current_cont = [0, []]
+    #|  let current_cont = [0, []];
     #|  while(true) {
-    #|    const [cont_or_external, args] = current_cont
+    #|    const [cont_or_external, args] = current_cont;
     #|    if (typeof cont_or_external === "number") { // not external
-    #|      current_cont = compiled_functions[cont_or_external](...args)
+    #|      current_cont = compiled_functions[cont_or_external](...args);
     #|    } else { // external
-    #|      const cont = args.pop()
-    #|      const result = cont_or_external(...args)
-    #|      current_cont = [cont[0], [result, cont]]
+    #|      const cont = args.pop();
+    #|      const result = cont_or_external(...args);
+    #|      current_cont = [cont[0], [result, cont]];
     #|    }
     #|  }
     #|}

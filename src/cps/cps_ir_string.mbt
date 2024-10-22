@@ -15,6 +15,7 @@ pub impl Show for Value with output(self, logger) {
 
 pub fn Value::to_string(self : Value) -> String {
   match self {
+    Bool(b) => b.to_string()
     Var(v) => v.to_string()
     Label(v) => ":" + v.to_string()
     Unit => "()"

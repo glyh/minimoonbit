@@ -87,7 +87,7 @@ fn CompileStatus::initialize(
     Typecheck => v.ast = Some(@types.Syntax::from_json!(@json.parse!(file)))
     PreCps =>
       v.typechecked = Some(@types.Syntax::from_json!(@json.parse!(file)))
-    _ => fail!("invalid start stage")
+    stage => @util.die("invalid start stage \{stage}")
   }
   v
 }

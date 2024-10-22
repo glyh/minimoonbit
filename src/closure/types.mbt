@@ -1,1 +1,0 @@
-typealias K = @knf.Knf

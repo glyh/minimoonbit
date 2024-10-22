@@ -3,6 +3,7 @@
 moon run ../src/bin/main.mbt -- --end-stage cps ./test_src/$1.mbt -o $1.cps
 moon run ../src/bin/main.mbt -- --end-stage clops ./test_src/$1.mbt -o $1.clops
 moon run ../src/bin/main.mbt -- ./test_src/$1.mbt -o $1.s
+moon run ../src/bin/main.mbt -- ./test_src/$1.mbt -o $1.js --js
 
 
 zig build-exe -target riscv64-linux -femit-bin=$1 \

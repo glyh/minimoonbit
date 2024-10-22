@@ -38,7 +38,7 @@ fn get_reg_ty(v : Value) -> RegTy {
     Var(var) => ty_get_reg_ty(var.ty.val)
     Label(_) => PTR64
     Unit => Void
-    Int(_) => I32
+    Int(_) | Bool(_) => I32
     Double(_) => F64
   }
 }
@@ -232,9 +232,13 @@ fn CodegenBlock::pull_val_i(self : CodegenBlock, val : Value) -> Reg {
       self.insert_asm(La(reg_swap, lbl.to_string()))
       reg_swap
     }
-    Unit | Int(0) => Zero
+    Unit | Int(0) | Bool(false) => Zero
     Int(i) => {
       self.insert_asm(Li(reg_swap, i.to_string()))
+      reg_swap
+    }
+    Bool(true) => {
+      self.insert_asm(Li(reg_swap, "1"))
       reg_swap
     }
     Double(f) => {

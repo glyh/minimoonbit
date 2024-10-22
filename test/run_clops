@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+moon run ../src/bin/main.mbt -v -g -- --end-stage clops --clops-interp ./test_src/$1.mbt

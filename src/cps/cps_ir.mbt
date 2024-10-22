@@ -25,6 +25,7 @@ pub enum Value {
   Label(Var)
   Unit
   Int(Int)
+  Bool(Bool)
   Double(Double)
 } derive(Eq)
 
@@ -41,6 +42,7 @@ pub fn Value::get_type(self : Value) -> T {
     Unit => Unit
     Int(_) => Int
     Double(_) => Double
+    Bool(_) => Bool
   }
 }
 

@@ -28,6 +28,7 @@ fn fix_label_to_var(v : Value) -> Value {
 pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
   match s {
     Unit => c(Unit)
+    Bool(b) => c(Bool(b))
     Int(i) => c(Int(i))
     Double(f) => c(Double(f))
     Let(ty, name, rhs, rest) => {

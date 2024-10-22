@@ -5,8 +5,7 @@ pub fn TyEnv::ast2precps(self : TyEnv, s : S) -> PreCps {
 
   match s {
     Unit => Unit
-    Bool(true) => Int(1)
-    Bool(false) => Int(0)
+    Bool(b) => Bool(b)
     Int(i) => Int(i)
     Double(f) => Double(f)
     Var(name) =>

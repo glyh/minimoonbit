@@ -29,4 +29,5 @@ test/*
 !test/test_src
 !test/script.gdb
 !test/build_*
+!test/run_clops
 !test/*_exe
