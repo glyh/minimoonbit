@@ -41,17 +41,17 @@ export fn minimbt_read_char() i32 {
 }
 
 export fn minimbt_print_int(i: i32) void {
-    std.debug.print("{d}", .{i});
+    _ = stdout.writer().print("{d}", .{i}) catch 0;
 }
 
 export fn minimbt_print_endline() void {
-    std.debug.print("\n", .{});
+    _ = stdout.write("\n") catch 0;
 }
 
 export fn minimbt_print_char(ch: i32) void {
     const c1: u32 = @intCast(ch);
     const c2: u8 = @truncate(c1);
-    std.debug.print("{c}", .{c2});
+    _ = stdout.writer().print("{c}", .{c2}) catch 0;
 }
 
 export fn minimbt_int_of_float(f: f64) i32 {
@@ -103,8 +103,8 @@ export fn minimbt_create_array(n: u32, v: i32) [*]i32 {
     return @ptrCast(arr);
 }
 
-export fn minimbt_create_ptr_array(n: u32, init: u64) [*]u64 {
-    const arr = allocator.alloc(u64, n) catch @panic("Alloc failed!");
+export fn minimbt_create_ptr_array(n: u32, init: *anyopaque) [*]*anyopaque {
+    const arr = allocator.alloc(*anyopaque, n) catch @panic("Alloc failed!");
     for (arr) |*item| {
         item.* = init;
     }
@@ -172,7 +172,7 @@ export fn mincaml_create_array(n: u32, v: i32) [*]i32 {
     return minimbt_create_array(n, v);
 }
 
-export fn mincaml_create_ptr_array(n: u32, init: u64) [*]u64 {
+export fn mincaml_create_ptr_array(n: u32, init: *anyopaque) [*]*anyopaque {
     return minimbt_create_ptr_array(n, init);
 }
 
