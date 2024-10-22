@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+node ../js_rt/runtime.mjs $1.js

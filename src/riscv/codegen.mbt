@@ -319,6 +319,8 @@ fn CodegenBlock::resolve_loop(
   let in_place : @hashset.T[RegRef] = @hashset.new()
   for item in args_regs_list {
     let (val, reg) = item
+    // NOTE: we may overwrite tmp regs, so we do this after all regs are pulled 
+    guard let Var(_) = val else { _ => continue }
     let pulled_reg = match val.get_type() {
       Double => F(self.pull_val_f(val))
       _ => I(self.pull_val_i(val))
@@ -329,7 +331,20 @@ fn CodegenBlock::resolve_loop(
     }
   }
   for item in args_regs_list {
-    let (_, reg_detect) = item
+    let (val, reg_detect) = item
+    guard let Var(_) = val else {
+      _ => {
+        self.cur_fn.val.body.push(
+          Comment("pull immediate \{val} on to \{reg_detect}"),
+        )
+        let pulled_reg = match val.get_type() {
+          Double => F(self.pull_val_f(val))
+          _ => I(self.pull_val_i(val))
+        }
+        self.mov_reg(reg_detect, pulled_reg)
+        continue
+      }
+    }
     if in_place.contains(reg_detect) {
       continue
     }
