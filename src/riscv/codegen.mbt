@@ -332,19 +332,6 @@ fn CodegenBlock::resolve_loop(
   }
   for item in args_regs_list {
     let (val, reg_detect) = item
-    guard let Var(_) = val else {
-      _ => {
-        self.cur_fn.val.body.push(
-          Comment("pull immediate \{val} on to \{reg_detect}"),
-        )
-        let pulled_reg = match val.get_type() {
-          Double => F(self.pull_val_f(val))
-          _ => I(self.pull_val_i(val))
-        }
-        self.mov_reg(reg_detect, pulled_reg)
-        continue
-      }
-    }
     if in_place.contains(reg_detect) {
       continue
     }
@@ -400,6 +387,22 @@ fn CodegenBlock::resolve_loop(
         }
       }
     }
+    // writing to cur reg still may affect other regs that needs value on us, so 
+    // we do this after chain is done
+    guard let Var(_) = val else {
+      _ => {
+        self.cur_fn.val.body.push(
+          Comment("pull immediate \{val} on to \{reg_detect}"),
+        )
+        let pulled_reg = match val.get_type() {
+          Double => F(self.pull_val_f(val))
+          _ => I(self.pull_val_i(val))
+        }
+        self.mov_reg(reg_detect, pulled_reg)
+        continue
+      }
+    }
+
   }
 }
 
@@ -810,7 +813,7 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
                 [
                   Sub(reg, reg_lhs, reg_rhs),
                   Addi(reg, reg, -1),
-                  Srai(reg, reg, 63), // take sign bit
+                  Srli(reg, reg, 63), // take sign bit
                 ]
               },
             )
