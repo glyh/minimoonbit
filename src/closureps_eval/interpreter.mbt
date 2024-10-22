@@ -1,3 +1,4 @@
+// TODO: create base env that includes closure of non closures
 pub enum Value {
   Unit
   Int(Int)
@@ -45,8 +46,18 @@ pub type! EvalError {
   VariableNotFind(Var)
 } derive(Show)
 
+fn CloPSInterpreter::reset_env(self : CloPSInterpreter) -> Unit {
+  self.cur_env = @hashmap.new()
+  for f in self.clops.func_no_free_vars {
+    let clo = self.clops.label_to_closure[f].unwrap()
+    self.cur_env[clo] = Tuple([Label(f), Unit])
+  }
+}
+
 pub fn CloPSInterpreter::new(clops : @closureps.ClosurePS) -> CloPSInterpreter {
-  { extern_fns: Map::new(), clops, cur_env: @hashmap.new() }
+  let ret = { extern_fns: Map::new(), clops, cur_env: @hashmap.new() }
+  ret.reset_env()
+  ret
 }
 
 fn CloPSInterpreter::replace_env(
@@ -127,12 +138,9 @@ pub fn CloPSInterpreter::call(
   }
   guard let Label(address) = f_val else { _ => @util.die("unreachable") }
   let f = self.clops.fnblocks[address].unwrap()
-  let new_env : @hashmap.T[Var, Value] = @hashmap.new()
-  //let args_to_pass = f.args.copy()
-  //args_to_pass.push(f.closure_ref)
-  zip2(f.args, args_val).each(fn { (k, v) => new_env[k] = v })
-  new_env[f.closure] = closure_ref
-  self.cur_env = new_env
+  self.reset_env()
+  zip2(f.args, args_val).each(fn { (k, v) => self.cur_env[k] = v })
+  self.cur_env[f.closure] = closure_ref
   f.body
 }
 

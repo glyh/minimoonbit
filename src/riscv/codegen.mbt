@@ -68,6 +68,12 @@ fn CodegenBlock::new(
   // 1. generate prologue
   let cur_fn : AssemblyFunction = { name, export: is_extrance, body: [] }
   // stores global exit point
+  if cfg.func_no_free_vars.contains(name_var) {
+    // Generate a global closure for any function that doesn't take free vars
+    cur_fn.body.append(
+      [Label(cfg.label_to_closure[name_var].unwrap().to_string()), DWord(name)],
+    )
+  }
   cur_fn.body.append(
     [
       Label(name),
@@ -592,6 +598,7 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
   for inst in block.insts {
     self.insert_asm(Comment(inst.to_string()))
     match inst {
+      LoadAddr(var, addr) => self.assign_i(var, fn(reg) { [La(reg, addr)] })
       Copy(bind, copied) =>
         match get_reg_ty(copied) {
           F64 => {

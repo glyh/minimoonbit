@@ -20,6 +20,8 @@ pub enum Inst {
   Load(Var)
   // So we can deal with the case where 1 tmp reg is not enough
   Copy(Var, Value)
+  // Support for constant closure 
+  LoadAddr(Var, String)
 } derive(Show)
 
 pub enum PCInst {
@@ -46,6 +48,8 @@ pub struct SsaCfg {
   blocks : @hashmap.T[Var, Block]
   fn_args : @hashmap.T[Var, Array[Var]]
   spilled : @hashmap.T[Var, @hashset.T[Var]]
+  label_to_closure : @hashmap.T[Var, Var]
+  func_no_free_vars : @hashset.T[Var]
   mut counter : Int
 }
 

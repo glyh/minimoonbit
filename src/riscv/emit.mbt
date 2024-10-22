@@ -3,7 +3,8 @@ let heap_ptr_label : Ref[String] = { val: "" }
 let stub_label : Ref[String] = { val: "" }
 
 pub fn emit(cfg : @ssacfg.SsaCfg) -> Array[AssemblyFunction] {
-  let cfg = reserve_freg(cfg)
+  //println(cfg.func_no_free_vars)
+  let cfg = before_alloc(cfg)
   let output = []
   heap_ptr_label.val = cfg.new_named("heap").to_string()
 

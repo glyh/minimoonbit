@@ -82,6 +82,7 @@ pub enum RvAsm {
   Tail(Label)
   Ret
   Seqz(Reg, Reg)
+  DWord(String)
   // Comments
   Label(String)
   Comment(String)
@@ -269,6 +270,10 @@ impl Show for RvAsm with output(self, logger) {
       logger.write_string(label._)
     }
     Ret => logger.write_string("ret")
+    DWord(data) => {
+      logger.write_string(".dword ")
+      logger.write_string(data)
+    }
     Label(label) => {
       logger.write_string(label)
       logger.write_string(":")

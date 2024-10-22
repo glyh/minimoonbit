@@ -95,9 +95,13 @@ fn CloEnv::get_closure(
 // collect all closures to top level and fix call convention
 // NOTE:
 // whenever we store a reference to an external call, we need to wrap it as a closure
-fn CloEnv::collect_closure(self : CloEnv, s : S) -> S {
+fn CloEnv::collect_closure(
+  self : CloEnv,
+  s : S,
+  func_no_free_vars : @hashset.T[Var]
+) -> S {
   fn rec(c : S) {
-    self.collect_closure(c)
+    self.collect_closure(c, func_no_free_vars)
   }
 
   fn recrbva(v : Value) {
@@ -111,13 +115,23 @@ fn CloEnv::collect_closure(self : CloEnv, s : S) -> S {
         bind,
         // NOTE: the reason for add all bindings is to shadow any closure rebind
         // so it doesn't accidentally rebind too muach than it should
-        self.add_rebind(bind, bind).collect_closure(rest),
+        self.add_rebind(bind, bind).collect_closure(rest, func_no_free_vars),
       )
     KthTuple(idx, v, bind, rest) =>
-      KthTuple(idx, v, bind, self.add_rebind(bind, bind).collect_closure(rest))
+      KthTuple(
+        idx,
+        v,
+        bind,
+        self.add_rebind(bind, bind).collect_closure(rest, func_no_free_vars),
+      )
     If(_cond, _then, _else) => If(_cond, rec(_then), rec(_else))
     Prim(op, args, bind, rest) =>
-      Prim(op, args, bind, self.add_rebind(bind, bind).collect_closure(rest))
+      Prim(
+        op,
+        args,
+        bind,
+        self.add_rebind(bind, bind).collect_closure(rest, func_no_free_vars),
+      )
     Fix(f, args, body, rest) => {
       // Step 1. Collect free variables to generate free_var & closure
       // NOTE: For unknown functions, we still need to pass them a closure
@@ -126,7 +140,13 @@ fn CloEnv::collect_closure(self : CloEnv, s : S) -> S {
       self.collect_label_closure(body, free_vars_set)
       let free_vars = free_vars_set
         .iter()
-        .filter(fn(v) { v != f && not(args.contains(v)) })
+        .filter(
+          fn(v) {
+            v != f &&
+            not(args.contains(v)) &&
+            not(func_no_free_vars.contains(v))
+          },
+        )
         .map(
           fn(var) {
             if self.named_fns.contains(var) {
@@ -163,13 +183,18 @@ fn CloEnv::collect_closure(self : CloEnv, s : S) -> S {
       let body_env = args
         .fold(init=self, fn(acc, ele) { acc.add_rebind(ele, ele) })
         .add_rebind(f, closure)
-      body_new = body_env.collect_closure(body_new)
+      body_new = body_env.collect_closure(body_new, func_no_free_vars)
 
       // Step 3. fill this function to fnblocks
       self.fnblocks[f] = { args, free_vars, body: body_new, closure }
+      if free_vars.length() == 0 {
+        func_no_free_vars.insert(f)
+      }
 
       // Step 4. recurse on rest
-      let rest_fixed_inner = self.add_rebind(f, closure).collect_closure(rest)
+      let rest_fixed_inner = self
+        .add_rebind(f, closure)
+        .collect_closure(rest, func_no_free_vars)
       if has_free_vars {
         let freevars_captured = self.new_named("fvs_cap", free_var_tup_ty)
         Tuple(
@@ -178,7 +203,7 @@ fn CloEnv::collect_closure(self : CloEnv, s : S) -> S {
           Tuple([Label(f), Var(freevars_captured)], closure, rest_fixed_inner),
         )
       } else {
-        Tuple([Label(f), Unit], closure, rest_fixed_inner)
+        rest_fixed_inner
       }
     }
     MakeArray(len, elem, kont) => {

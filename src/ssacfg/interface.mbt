@@ -4,6 +4,10 @@ pub fn clops2ssacfg(clops : @closureps.ClosurePS) -> SsaCfg {
     fn_args: @hashmap.new(),
     spilled: @hashmap.new(),
     counter: clops.counter.val,
+    // these 2 fields are used so we can generate a persistent 
+    // closure for any function that doesn't need free vars
+    label_to_closure: clops.label_to_closure,
+    func_no_free_vars: clops.func_no_free_vars,
   }
   let entry_label : @cps.Var = {
     name: { val: Some("main") },

@@ -1,3 +1,4 @@
+// TODO: create base env that includes closure of non closures
 struct JsEmitter {
   clops : @closureps.ClosurePS
   indent : Int
@@ -150,8 +151,20 @@ pub fn JsEmitter::emit_cps(self : JsEmitter, cps : @cps.Cps) -> String {
 }
 
 pub fn JsEmitter::emit(self : JsEmitter) -> String {
-  let mut output = "const compiled_functions = ["
-  let line_start = "\n  "
+  let line_start = "\n"
+  let mut output = ""
+
+  // A. emit all const closures
+  output +=
+    #|// All const closures
+  for f in self.clops.func_no_free_vars {
+    let clo = self.clops.label_to_closure[f].unwrap()
+    output += line_start +
+      "const \{emit_var(clo)} = [\{emit_val(self, Label(f))}, []]"
+  }
+  output += line_start
+  // B. emit all functions
+  output += line_start + "const compiled_functions = ["
 
   // 1. emit root
   output += line_start + "function() { // root"

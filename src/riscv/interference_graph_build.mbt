@@ -114,6 +114,7 @@ fn LiveVarAnalysis::collect_inst(
       args.each(fn(v) { self.collect_val(v) })
     }
     Load(bind) => self.var_set.remove(bind)
+    LoadAddr(bind, _) => self.var_set.remove(bind)
     Store(bind) => self.var_set.insert(bind)
   }
 }
