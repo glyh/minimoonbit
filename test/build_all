@@ -1,13 +1,24 @@
 #!/usr/bin/env bash
 
+if [ -f ./test_src/$1.mbt ]; then 
+  SOURCE=./test_src/$1.mbt
+elif [ -f ./longer-cases/$1.mbt ]; then
+  SOURCE=./longer-cases/$1.mbt
+else
+  echo "No such test case: $1"
+  exit 1
+fi
+
+echo "Using source file $SOURCE"
+
 echo "building CPS IR"
-moon run ../src/bin/main.mbt -- --end-stage cps ./test_src/$1.mbt -o $1.cps
+moon run ../src/bin/main.mbt -- --end-stage cps $SOURCE -o $1.cps
 echo "building CLOPS IR"
-moon run ../src/bin/main.mbt -- --end-stage clops ./test_src/$1.mbt -o $1.clops
+moon run ../src/bin/main.mbt -- --end-stage clops $SOURCE -o $1.clops
 echo "building ASM"
-moon run ../src/bin/main.mbt -- ./test_src/$1.mbt -o $1.s
+moon run ../src/bin/main.mbt -- $SOURCE -o $1.s
 echo "building JS"
-moon run ../src/bin/main.mbt -- ./test_src/$1.mbt -o $1.js --js
+moon run ../src/bin/main.mbt -- $SOURCE -o $1.js --js
 
 
 echo "building Binary"

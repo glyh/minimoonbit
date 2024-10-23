@@ -1,4 +1,30 @@
 #!/usr/bin/env bash
 
 ./build_all $1
-./run_exe $1
+
+if [ -f ./test_src/$1.mbt ]; then 
+  ANS=./test_src/$1.ans
+  INPUT=./test_src/$1.in
+elif [ -f ./longer-cases/$1.mbt ]; then
+  ANS=./longer-cases/$1.ans
+  INPUT=./longer-cases/$1.in
+else
+  echo "No such test case: $1"
+  exit 1
+fi
+
+if [ -f $INPUT ]; then
+  echo "Running with input from $INPUT"
+  cat $INPUT | ./run_exe $1
+else
+  echo "Running with input from STDIN"
+  ./run_exe $1
+fi
+
+if [ ! -f $ANS ]; then 
+  echo "No output file for $1"
+  exit 1
+fi 
+
+echo "Here's the expected output"
+cat $ANS
