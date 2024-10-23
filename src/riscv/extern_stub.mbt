@@ -17,7 +17,6 @@ fn collect_externals(cfg : @ssacfg.SsaCfg) -> @hashset.T[Var] {
   }
 
   for item in cfg.blocks {
-    //println("start of \{item.0}: \{out}")
     let (_, blk) = item
     for inst in blk.insts {
       match inst {
@@ -122,13 +121,13 @@ fn generate_stub(cfg : @ssacfg.SsaCfg) -> AssemblyFunction {
     body.append(
       [
         Label(stub_resolved),
-        Comment("call the external function"),
+        Comment("Call the external function"),
         Jalr(T6),
-        Comment("A0 holds result, put continuation as 2nd arg"),
+        Comment("Put continuation at \{kont_reg}"),
         Mv(kont_reg, S1),
-        Comment("fetch continuation address"),
+        Comment("Fetch continuation address"),
         Ld(T1, { base: S1, offset: 0 }),
-        Comment("call continuation"),
+        Comment("Call continuation"),
         Jr(T1),
       ],
     )

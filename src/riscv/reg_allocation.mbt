@@ -31,7 +31,6 @@ fn reg_allocate_on_fn(
   input : @ssacfg.SsaCfg,
   fn_label : Var
 ) -> @hashmap.T[Var, RegRef] {
-  //println("allocation for \{fn_label}")
 
   // generate pre allocation
   let allocation_i : @hashmap.T[Var, Reg] = @hashmap.new()
