@@ -5,7 +5,7 @@ fn is_imm(v : Value) -> Bool {
   }
 }
 
-// NOTE: reserve a reg for float comparison when both operand are tmps
+// NOTE: reserve a reg for binary operations when both operand are imms
 fn reserve_swap_reg(cfg : @ssacfg.SsaCfg, block : @ssacfg.Block) -> Unit {
   let insts_backup = block.insts
   let insts = []
