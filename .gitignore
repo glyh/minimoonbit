@@ -32,3 +32,5 @@ test/*
 !test/build_*
 !test/run_*
 !test/debug_*
+
+/zig-linux-*.tar.xz

@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 
-../rvlinux -n $1 --accurate
+../libriscv/emulator/rvlinux -n $1 --accurate
