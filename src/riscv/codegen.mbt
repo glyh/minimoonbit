@@ -205,11 +205,7 @@ fn CodegenBlock::assign_f(
   self.insert_asms(todo(target))
 }
 
-fn CodegenBlock::pull_val_f(
-  self : CodegenBlock,
-  val : Value,
-  ~freg_swap : FReg = freg_swap
-) -> FReg {
+fn CodegenBlock::pull_val_f(self : CodegenBlock, val : Value) -> FReg {
   match val {
     Var(var) => {
       guard let F(reg) = self.allocation[var].unwrap() else {
@@ -231,11 +227,7 @@ fn CodegenBlock::pull_val_f(
   }
 }
 
-fn CodegenBlock::pull_val_i(
-  self : CodegenBlock,
-  val : Value,
-  ~reg_swap : Reg = reg_swap
-) -> Reg {
+fn CodegenBlock::pull_val_i(self : CodegenBlock, val : Value) -> Reg {
   match val {
     Var(var) => {
       if var.ty.val == Unit {
@@ -742,10 +734,7 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
             let reg_lhs = self.pull_val_i(lhs)
             // NOTE: whenever we pull 2 regs and both of them maybe tmp, 
             // we replace the second tmp with target
-            let reg_rhs = self.pull_val_i(
-              rhs,
-              reg_swap=if reg_lhs == reg_swap { reg } else { reg_swap },
-            )
+            let reg_rhs = self.pull_val_i(rhs)
             match op {
               Add => [Add(reg, reg_lhs, reg_rhs)]
               Sub => [Sub(reg, reg_lhs, reg_rhs)]
@@ -759,10 +748,7 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
           bind,
           fn(reg) {
             let reg_lhs = self.pull_val_f(lhs)
-            let reg_rhs = self.pull_val_f(
-              rhs,
-              freg_swap=if reg_lhs == freg_swap { reg } else { freg_swap },
-            )
+            let reg_rhs = self.pull_val_f(rhs)
             match op {
               Add => [FaddD(reg, reg_lhs, reg_rhs)]
               Sub => [FsubD(reg, reg_lhs, reg_rhs)]
@@ -787,10 +773,7 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
             self.assign_i(
               bind,
               fn(reg) {
-                let reg_rhs = self.pull_val_i(
-                  rhs,
-                  reg_swap=if reg_lhs == reg_swap { reg } else { reg_swap },
-                )
+                let reg_rhs = self.pull_val_i(rhs)
                 [Xor(reg_swap, reg_lhs, reg_rhs), Seqz(reg, reg_swap)]
               },
             )
@@ -813,10 +796,7 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
               bind,
               // HACK: we're using 32bits int so this won't overflow
               fn(reg) {
-                let reg_rhs = self.pull_val_i(
-                  rhs,
-                  reg_swap=if reg_lhs == reg_swap { reg } else { reg_swap },
-                )
+                let reg_rhs = self.pull_val_i(rhs)
                 [
                   Sub(reg, reg_lhs, reg_rhs),
                   Addi(reg, reg, -1),
