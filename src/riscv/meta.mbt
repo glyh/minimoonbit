@@ -18,7 +18,7 @@ fn generate_meta(cfg : @ssacfg.SsaCfg) -> AssemblyFunction {
       Align(3),
       Label("stack_space"),
       Comment("Skips 128 Mib For stack"),
-      Skip(128 * 1024 * 1024),
+      Skip(1024 * 1024 * 1024),
       Label("stack_space_end"),
     ],
   )
