@@ -1,11 +1,11 @@
 fn reg_spill_fn(
   cfg : @ssacfg.SsaCfg,
-  all_vars : @hashset.T[Var],
-  can_allocate : Array[Var],
+  all_vars_not_preallocated : @hashset.T[Var],
+  can_allocate : Array[Var], // vars that can be allocated but not yet
   interference : InterferenceGraph,
   fn_name : Var
 ) -> Var {
-  let spill_candidates = all_vars
+  let spill_candidates = all_vars_not_preallocated
     .iter()
     .filter(fn(var) { not(can_allocate.contains(var)) })
     .collect()

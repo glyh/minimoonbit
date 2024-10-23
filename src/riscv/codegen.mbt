@@ -89,7 +89,11 @@ fn CodegenBlock::new(
   let params = cfg.fn_args[name_var].unwrap()
   for param in params {
     let alloc_reg = allocation[param].unwrap()
-    dirtied.insert(alloc_reg)
+    if cfg.spilled.contains(param) {
+      @util.die("param \{param} of fn \{name_var} spilled")
+    } else {
+      dirtied.insert(alloc_reg)
+    }
   }
 
   // 3. collect spilled vars

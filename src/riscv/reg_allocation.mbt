@@ -66,14 +66,22 @@ fn reg_allocate_on_fn(
       vars_f, graph_f, alloc_fregs, allocation_f, simplify_stack_f,
     )
     if should_spill_i {
+      let vars_i_spillable = vars_i
+        .iter()
+        .filter(fn(var) { not(allocation_i.contains(var)) })
+        |> @hashset.from_iter()
       let i_spilled = reg_spill_fn(
-        input, vars_i, simplify_stack_i, graph_i, fn_label,
+        input, vars_i_spillable, simplify_stack_i, graph_i, fn_label,
       )
       spilled_set.insert(i_spilled)
     }
     if should_spill_f {
+      let vars_f_spillable = vars_i
+        .iter()
+        .filter(fn(var) { not(allocation_f.contains(var)) })
+        |> @hashset.from_iter()
       let f_spilled = reg_spill_fn(
-        input, vars_f, simplify_stack_f, graph_f, fn_label,
+        input, vars_f_spillable, simplify_stack_f, graph_f, fn_label,
       )
       spilled_set.insert(f_spilled)
     }

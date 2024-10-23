@@ -182,12 +182,11 @@ pub fn JsEmitter::emit(self : JsEmitter) -> String {
   output += line_start
   // B. emit all functions
   output += line_start + "const compiled_functions = ["
-
+  let line_start = "\n  "
   // 1. emit root
   output += line_start + "function() { // root"
   output += self.indent().indent().emit_cps(self.clops.root)
   output += line_start + "},"
-
   // 2. emit all functions
   for label in self.lid2label {
     let cur_fn = self.clops.fnblocks[label].unwrap()
@@ -197,7 +196,7 @@ pub fn JsEmitter::emit(self : JsEmitter) -> String {
     let args_with_closure_emitted = args_with_closure.map(emit_var).join(", ")
     output += line_start +
       "function(\{args_with_closure_emitted}) { // \{label}"
-    // i. emit body
+    // ii. emit body
     output += self.indent().indent().emit_cps(cur_fn.body)
     output += line_start + "},"
   }
