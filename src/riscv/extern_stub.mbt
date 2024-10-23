@@ -121,6 +121,9 @@ fn generate_stub(cfg : @ssacfg.SsaCfg) -> AssemblyFunction {
     body.append(
       [
         Label(stub_resolved),
+        Comment("Round down the stack for alignment, giving up the space"),
+        Li(T5, "-16"),
+        And(Sp, Sp, T5),
         Comment("Call the external function"),
         Jalr(T6),
         Comment("Put continuation at \{kont_reg}"),

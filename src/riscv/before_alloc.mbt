@@ -13,7 +13,7 @@ fn reserve_swap_reg(cfg : @ssacfg.SsaCfg, block : @ssacfg.Block) -> Unit {
     match inst {
       Prim(bind, Math(_) | Eq | Le as op, [lhs, rhs]) as inst =>
         if is_imm(lhs) && is_imm(rhs) {
-          let tmp = cfg.new_named("tmp_swap", ty=Double)
+          let tmp = cfg.new_named("tmp_swap", ty=lhs.get_type())
           insts.push(@ssacfg.Inst::Copy(tmp, lhs))
           insts.push(Prim(bind, op, [Var(tmp), rhs]))
         } else {

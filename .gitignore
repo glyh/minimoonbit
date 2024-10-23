@@ -27,6 +27,7 @@ __pycache__
 
 test/*
 !test/test_src
+!test/longer-cases
 !test/script.gdb
 !test/build_*
 !test/run_*
