@@ -4,14 +4,6 @@ struct JsEmitter {
 }
 
 pub fn JsEmitter::new(clops : @closureps.ClosurePS) -> JsEmitter {
-  // NOTE: idx 0 is reserved for root
-  let mut idx = 1
-  let lid2label = []
-  for item in clops.fnblocks {
-    let label = item.0
-    lid2label.push(label)
-    idx += 1
-  }
   { clops, indent: 0 }
 }
 
