@@ -1,9 +1,7 @@
-let beta_contract_quota = 3
-
 struct BetaContractInfo {
   referred_as_closure : Bool
   num_called : Int
-}
+} derive(Show)
 
 fn BetaContractInfo::merge_result(
   self : BetaContractInfo,
@@ -65,6 +63,9 @@ fn expand_function(
     Prim(op, args, bind, rest) => Prim(op, args, bind, rec(rest))
     App(f2, args2) =>
       if f2 == Label(f) || f2 == Var(f) {
+        // NOTE: when extracting to generate multiple copy, 
+        // we need to ensure each copy has distinctive ids
+        // I don't have them implemented here, however 
         let a = zip2(params, args2).fold(
           init=body,
           fn(acc, ele) {
@@ -80,35 +81,32 @@ fn expand_function(
   }
 }
 
-fn beta_contraction(c : Cps) -> Cps {
-  let rec = beta_contraction
+fn beta_contraction(c : Cps, optimized : Ref[Bool]) -> Cps {
+  fn rec(c : Cps) {
+    beta_contraction(c, optimized)
+  }
+
   match c {
     Tuple(arr, bind, inner) => Tuple(arr, bind, rec(inner))
     KthTuple(idx, v, bind, inner) => KthTuple(idx, v, bind, rec(inner))
-    // when f1 is an alias for f2, always contract even if we have closure reference
-    Fix(f1, args1, App(f2, args2), rest) => {
-      let args1_fix = args1.map(fn { v => Var(v) })
-      if args1_fix == args2 {
-        // f1 is an alias of f2
-        rec(rest.replace_var_bind(f1, f2))
-      } else {
-        Fix(f1, args1, App(f2, args2), rec(rest))
-      }
-    }
     Fix(f, args, body, rest) => {
       let body_info = beta_contract_info(body, f)
       let rest_info = beta_contract_info(rest, f)
       if body_info.num_called > 0 ||
         body_info.referred_as_closure ||
         rest_info.referred_as_closure ||
-        rest_info.num_called > beta_contract_quota {
+        rest_info.num_called > 1 {
         // NOTE: 
         // 1. self-recursive function won't beta extract
         // 2. any function referred as closure won't beta extract
         Fix(f, args, rec(body), rec(rest))
       } else {
-        let extracted = expand_function(f, args, body, rest)
-        rec(extracted)
+        optimized.val = true
+        let contracted = expand_function(f, args, body, rest)
+        //println("=========================")
+        //println("After contracting \{f}: ")
+        //println(contracted)
+        rec(contracted)
       }
     }
     If(cond, _then, _else) => If(cond, rec(_then), rec(_else))

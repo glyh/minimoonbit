@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+if [ -f ./test_src/$1.mbt ]; then 
+  SOURCE=./test_src/$1.mbt
+elif [ -f ./longer-cases/$1.mbt ]; then
+  SOURCE=./longer-cases/$1.mbt
+else
+  echo "No such test case: $1"
+  exit 1
+fi
+
+echo "Using source file $SOURCE"
+
+echo "building ASM"
+moon run ../src/bin/main.mbt -- $SOURCE -o $1.s
+
+
+echo "building Binary"
+zig build-exe -target riscv64-linux -femit-bin=$1 \
+  $1.s ../riscv_rt/zig-out/lib/libmincaml.a \
+  -O Debug -fno-strip -mcpu=baseline_rv64
+
