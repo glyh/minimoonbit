@@ -116,7 +116,7 @@ fn CompileStatus::step(self : CompileStatus) -> Bool {
     Cps => {
       let cpsenv = @cps.CpsEnv::new(self.counter)
       let mut cps = cpsenv.precps2cps(self.precps.unwrap(), fn { _ => Exit })
-      cps = @cps.alias_analysis(cps)
+      cps = @cps.optimize_cps(cps)
       self.cps = Some(cps)
       self.counter = cpsenv.counter.val
     }

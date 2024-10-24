@@ -1,5 +1,5 @@
-pub fn alias_analysis(c : Cps) -> Cps {
-  let rec = alias_analysis
+fn beta_contraction(c : Cps) -> Cps {
+  let rec = beta_contraction
   match c {
     Tuple(arr, bind, inner) => Tuple(arr, bind, rec(inner))
     KthTuple(idx, v, bind, inner) => KthTuple(idx, v, bind, rec(inner))
@@ -19,9 +19,6 @@ pub fn alias_analysis(c : Cps) -> Cps {
   }
 }
 
-test "array equal" {
-  let a1 = [1, 2, 3, 4]
-  let a2 = [1, 2, 3]
-  a2.push(4)
-  assert_eq!(a1, a2)
+pub fn optimize_cps(c : Cps) -> Cps {
+  c |> beta_contraction()
 }
