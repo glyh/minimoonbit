@@ -99,6 +99,7 @@ fn beta_contraction(c : Cps, optimized : Ref[Bool]) -> Cps {
         // NOTE: 
         // 1. self-recursive function won't beta extract
         // 2. any function referred as closure won't beta extract
+        // 3. this also eliminates any function that isn't called
         Fix(f, args, rec(body), rec(rest))
       } else {
         optimized.val = true
