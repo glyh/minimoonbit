@@ -19,7 +19,9 @@ fn alias_analysis(c : Cps, optimized : Ref[Bool]) -> Cps {
     }
     Fix(f, args, body, rest) => Fix(f, args, rec(body), rec(rest))
     If(cond, _then, _else) => If(cond, rec(_then), rec(_else))
+    IfEq(lhs, rhs, _then, _else) => IfEq(lhs, rhs, rec(_then), rec(_else))
+    IfLe(lhs, rhs, _then, _else) => IfLe(lhs, rhs, rec(_then), rec(_else))
     Prim(op, vs, bind, rest) => Prim(op, vs, bind, rec(rest))
-    c => c
+    MakeArray(_) | Exit | App(_) => c
   }
 }
