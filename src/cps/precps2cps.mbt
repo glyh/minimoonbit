@@ -33,10 +33,6 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
     Double(f) => c(Double(f))
     Let(ty, name, rhs, rest) => {
       fn c1(v : Value) {
-        match v {
-          Var(v) => v.name.val = name.name // mark their name
-          _ => ()
-        }
         let rest = self.precps2cps(rest, c)
         let orig_binding = Var::from_precps(name, ty)
         rest.replace_var_bind(orig_binding, v)

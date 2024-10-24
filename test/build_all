@@ -11,6 +11,8 @@ fi
 
 echo "Using source file $SOURCE"
 
+echo "building PRECPS IR"
+moon run ../src/bin/main.mbt -- --end-stage precps $SOURCE -o $1.precps
 echo "building CPS IR"
 moon run ../src/bin/main.mbt -- --end-stage cps $SOURCE -o $1.cps
 echo "building CLOPS IR"
