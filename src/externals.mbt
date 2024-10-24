@@ -1,3 +1,5 @@
+// TODO: 
+// Maybe generate primitives for create_*_array
 pub let externals_list : Array[(String, Type)] = [
   ("read_int", Fun([], Int)),
   ("print_int", Fun([Int], Unit)),
@@ -8,7 +10,6 @@ pub let externals_list : Array[(String, Type)] = [
   ("float_of_int", Fun([Int], Double)),
   ("truncate", Fun([Double], Int)),
   ("floor", Fun([Double], Double)),
-  ("abs_float", Fun([Double], Double)),
   ("abs_float", Fun([Double], Double)),
   ("sqrt", Fun([Double], Double)),
   ("sin", Fun([Double], Double)),

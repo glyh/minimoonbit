@@ -84,21 +84,6 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
 
       self.precps2cps_list(elements, c1)
     }
-    // (a1, a2, a3, .., an, (r) -> Unit)
-    App(ret_ty, f, args) => {
-      let k_ref = self.new_tmp(Fun([ret_ty], Unit))
-      let x_ref = self.new_tmp(ret_ty)
-      fn c1(f : Value) {
-        fn c2(es : @immut/list.T[Value]) {
-          App(f, es.iter().append(Var(k_ref)).map(fix_label_to_var).collect())
-        }
-
-        self.precps2cps_list(args, c2)
-      }
-
-      Fix(k_ref, [x_ref], c(Var(x_ref)), self.precps2cps(f, c1))
-    }
-
     // WARN: Array Creation must come with an external call and thus continuation
     Prim(ret_ty, MakeArray, rands) => {
       let k_ref = self.new_tmp(Fun([ret_ty], Unit))
@@ -131,6 +116,55 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
       }
 
       self.precps2cps_list(rands, c1)
+    }
+    // (a1, a2, a3, .., an, (r) -> Unit)
+    App(ret_ty, f, args) => {
+      fn generate_app() {
+        let k_ref = self.new_tmp(Fun([ret_ty], Unit))
+        let x_ref = self.new_tmp(ret_ty)
+        fn c1(f : Value) {
+          fn c2(es : @immut/list.T[Value]) {
+            App(f, es.iter().append(Var(k_ref)).map(fix_label_to_var).collect())
+          }
+
+          self.precps2cps_list(args, c2)
+        }
+
+        Fix(k_ref, [x_ref], c(Var(x_ref)), self.precps2cps(f, c1))
+      }
+
+      guard let Var(_, var) | Label(_, var) = f else {
+        _ => return generate_app()
+      }
+      guard var.id < 0 else { return generate_app() }
+      guard let Some(name) = var.name else { _ => return generate_app() }
+      match name {
+        "int_of_float" | "truncate" => {
+          fn c1(a : @immut/list.T[Value]) {
+            let tmp = self.new_tmp(ret_ty)
+            Prim(IntOfFloat, a.iter().collect(), tmp, c(Var(tmp)))
+          }
+
+          self.precps2cps_list(args, c1)
+        }
+        "float_of_int" => {
+          fn c1(a : @immut/list.T[Value]) {
+            let tmp = self.new_tmp(ret_ty)
+            Prim(FloatOfInt, a.iter().collect(), tmp, c(Var(tmp)))
+          }
+
+          self.precps2cps_list(args, c1)
+        }
+        "abs_float" => {
+          fn c1(a : @immut/list.T[Value]) {
+            let tmp = self.new_tmp(ret_ty)
+            Prim(AbsFloat, a.iter().collect(), tmp, c(Var(tmp)))
+          }
+
+          self.precps2cps_list(args, c1)
+        }
+        _ => generate_app()
+      }
     }
     KthTuple(ret_ty, offset, tup) => {
       fn c1(v : Value) {

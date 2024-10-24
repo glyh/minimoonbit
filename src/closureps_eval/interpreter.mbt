@@ -268,6 +268,27 @@ pub fn CloPSInterpreter::eval(
       }
       continue rest
     }
+    Prim(IntOfFloat, [f], bind, rest) => {
+      match self.eval_v!(f) {
+        Double(f) => self.cur_env[bind] = Int(f.to_int())
+        val => @util.die("unexpected input \{val} for `int_of_float`")
+      }
+      continue rest
+    }
+    Prim(FloatOfInt, [i], bind, rest) => {
+      match self.eval_v!(i) {
+        Int(i) => self.cur_env[bind] = Double(i.to_double())
+        val => @util.die("unexpected input \{val} for `float_of_int`")
+      }
+      continue rest
+    }
+    Prim(AbsFloat, [f], bind, rest) => {
+      match self.eval_v!(f) {
+        Double(f) => self.cur_env[bind] = Double(@double.abs(f))
+        val => @util.die("unexpected input \{val} for `int_of_float`")
+      }
+      continue rest
+    }
     Prim(_) => @util.die("malformed prim call \{expr}")
     MakeArray(len, elem, kont_closure) =>
       match (self.eval_v!(len), self.eval_v!(elem)) {

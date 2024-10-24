@@ -15,6 +15,18 @@ fn SsaCfg::cps2block(
       cur_block.insts.push(KthTuple(bind, tup, idx))
       continue rest
     }
+    Prim(IntOfFloat, args, bind, rest) => {
+      cur_block.insts.push(Prim(bind, IntOfFloat, args))
+      continue rest
+    }
+    Prim(FloatOfInt, args, bind, rest) => {
+      cur_block.insts.push(Prim(bind, FloatOfInt, args))
+      continue rest
+    }
+    Prim(AbsFloat, args, bind, rest) => {
+      cur_block.insts.push(Prim(bind, AbsFloat, args))
+      continue rest
+    }
     Prim(Not, args, bind, rest) => {
       cur_block.insts.push(Prim(bind, Not, args))
       continue rest

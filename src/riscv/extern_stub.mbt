@@ -1,3 +1,6 @@
+// TODO: if S reg being occupied for free vars of continuation
+// we can't use them for temporary storage here.
+
 fn collect_externals(cfg : @ssacfg.SsaCfg) -> @hashset.T[Var] {
   let out = @hashset.new()
   fn collect_label_var(v : Var) {

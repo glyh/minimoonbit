@@ -7,6 +7,9 @@ pub enum PrimOp {
   Math(@typing.Op, @precps.Numeric)
   Eq
   Le
+  IntOfFloat
+  FloatOfInt
+  AbsFloat
 } derive(Show)
 
 pub enum Inst {

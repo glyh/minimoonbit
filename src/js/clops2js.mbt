@@ -138,6 +138,21 @@ pub fn JsEmitter::emit_cps(self : JsEmitter, cps : @cps.Cps) -> String {
         "const \{emit_var(bind)} = \{lhs_emit} <= \{rhs_emit};"
       continue rest
     }
+    Prim(IntOfFloat, [f], bind, rest) => {
+      let f_emit = emit_val(f)
+      output += line_start + "const \{emit_var(bind)} = Math.trunc(\{f_emit});"
+      continue rest
+    }
+    Prim(FloatOfInt, [i], bind, rest) => {
+      let i_emit = emit_val(i)
+      output += line_start + "const \{emit_var(bind)} = \{i_emit};"
+      continue rest
+    }
+    Prim(AbsFloat, [f], bind, rest) => {
+      let f_emit = emit_val(f)
+      output += line_start + "const \{emit_var(bind)} = Math.abs(\{f_emit});"
+      continue rest
+    }
     Prim(_) as expr => @util.die("malformed prim call \{expr}")
     MakeArray(len, elem, kont_closure) => {
       let len_emit = emit_val(len)

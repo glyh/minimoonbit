@@ -54,6 +54,9 @@ pub enum PrimOp {
   Math(@top.Op, @precps.Numeric)
   Eq
   Le
+  IntOfFloat
+  FloatOfInt
+  AbsFloat
 } derive(Show)
 
 pub enum Cps {

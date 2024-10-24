@@ -1,3 +1,5 @@
+// TODO: 
+// 1. aggressively throw free variables of current continuation closure on stored registers
 enum RegTy {
   I32
   PTR64
@@ -165,13 +167,16 @@ fn CodegenBlock::insert_asm(self : CodegenBlock, asm : RvAsm) -> Unit {
     | FeqD(reg, _, _)
     | FleD(reg, _, _)
     | Seqz(reg, _)
-    | FmvXD(reg, _) | La(reg, _) | Li(reg, _) | Neg(reg, _) | Mv(reg, _) =>
+    | FmvXD(reg, _)
+    | La(reg, _) | Li(reg, _) | Neg(reg, _) | Mv(reg, _) | Fcvtwd(reg, _) =>
       self.dirtied.insert(I(reg))
     FaddD(freg, _, _)
     | FsubD(freg, _, _)
     | FmulD(freg, _, _)
     | FdivD(freg, _, _)
-    | Fld(freg, _) | FmvDX(freg, _) | FnegD(freg, _) | FmvD(freg, _) =>
+    | Fld(freg, _)
+    | FmvDX(freg, _)
+    | FnegD(freg, _) | FmvD(freg, _) | Fcvtdw(freg, _) | Fsgnjxd(freg, _, _) =>
       self.dirtied.insert(F(freg))
     _ => ()
   }
@@ -661,6 +666,21 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
       Prim(bind, Neg(Int), [v]) => {
         let reg_v = self.pull_val_i(v)
         self.assign_i(bind, fn { reg_bind => [Neg(reg_bind, reg_v)] })
+      }
+      Prim(bind, IntOfFloat, [f]) => {
+        let reg_v = self.pull_val_f(f)
+        self.assign_i(bind, fn { reg_bind => [Fcvtwd(reg_bind, reg_v)] })
+      }
+      Prim(bind, FloatOfInt, [i]) => {
+        let reg_v = self.pull_val_i(i)
+        self.assign_f(bind, fn { reg_bind => [Fcvtdw(reg_bind, reg_v)] })
+      }
+      Prim(bind, AbsFloat, [f]) => {
+        let reg_v = self.pull_val_f(f)
+        self.assign_f(
+          bind,
+          fn { reg_bind => [Fsgnjxd(reg_bind, reg_v, reg_v)] },
+        )
       }
       // TODO: may generate more higher quality asm if idx is known at compile time
       Prim(bind, Get, [arr, idx]) => {
