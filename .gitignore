@@ -33,5 +33,6 @@ test/*
 !test/build_*
 !test/run_*
 !test/debug_*
+!test/source_generator
 
 /zig-linux-*.tar.xz
