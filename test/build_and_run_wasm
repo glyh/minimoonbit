@@ -15,10 +15,10 @@ fi
 
 if [ -f $INPUT ]; then
   echo "Running with input from $INPUT"
-  cat $INPUT | ./run_rv64 $1
+  cat $INPUT | ./run_wasm $1
 else
   echo "Running with input from STDIN"
-  ./run_rv64 $1
+  ./run_wasm $1
 fi
 
 if [ ! -f $ANS ]; then 

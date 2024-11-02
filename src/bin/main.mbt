@@ -10,6 +10,7 @@ enum Stages {
   Cps
   CloPS
   // NOTE: add stages here.
+  Wasm
   Js
   SsaCfg
   Asm
@@ -37,11 +38,16 @@ fn Stages::next(self : Stages) -> Stages {
     Stages::Typecheck => Stages::PreCps
     Stages::PreCps => Stages::Cps
     Stages::Cps => Stages::CloPS
-    Stages::CloPS => if emit_js.val { Stages::Js } else { Stages::SsaCfg }
-    Stages::Js => Stages::Finished
+    Stages::CloPS =>
+      match (emit_js.val, emit_wasm.val) {
+        (true, false) => Stages::Js
+        (false, true) => Stages::Wasm
+        (false, false) => Stages::SsaCfg
+        _ => @util.die("can't emit for both Wasm and Js")
+      }
     Stages::SsaCfg => Stages::Asm
     // NOTE: add stages here.
-    Stages::Asm => Stages::Finished
+    Stages::Asm | Stages::Js | Stages::Wasm => Stages::Finished
     Stages::Finished => Stages::Finished
   }
 }
@@ -58,6 +64,7 @@ struct CompileStatus {
   mut clops : @closureps.ClosurePS?
   mut cfg : @ssacfg.SsaCfg?
   mut js_emitted : String
+  mut wasm_emitted : @wasm.WasmTarget?
   // NOTE: add stages here.
   mut asm : Array[@riscv.AssemblyFunction]?
 }
@@ -79,9 +86,10 @@ fn CompileStatus::initialize(
     clops: None,
     cfg: None,
     js_emitted: "",
-    // NOTE: add stages here.
+    wasm_emitted: None,
     asm: None,
   }
+  // NOTE: add stages here.
   match start_stage {
     Parse => v.source_code = Some(file)
     Typecheck => v.ast = Some(@types.Syntax::from_json!(@json.parse!(file)))
@@ -133,6 +141,10 @@ fn CompileStatus::step(self : CompileStatus) -> Bool {
       let emitter = @js.JsEmitter::new(self.clops.unwrap())
       self.js_emitted = emitter.emit()
     }
+    Wasm => {
+      let emitter = @wasm.WasmEmitter::new(self.clops.unwrap())
+      self.wasm_emitted = Some(emitter.emit())
+    }
     // NOTE: add stages here.
     Asm => {
       let real_asm = @riscv.emit(self.cfg.unwrap())
@@ -159,14 +171,15 @@ fn CompileStatus::output(self : CompileStatus, json : Bool) -> String {
       PreCps => self.typechecked.unwrap().to_string()
       Cps => self.precps.unwrap().to_string()
       CloPS => self.cps.unwrap().to_string()
-      SsaCfg | Js => self.clops.unwrap().to_string()
+      SsaCfg | Js | Wasm => self.clops.unwrap().to_string()
       Asm => self.cfg.unwrap().to_string()
       // NOTE: add stages here.
       Finished =>
-        if emit_js.val {
-          self.js_emitted
-        } else {
-          @riscv.print_functions(self.asm.unwrap())
+        match (emit_js.val, emit_wasm.val) {
+          (true, false) => self.js_emitted
+          (false, true) => self.wasm_emitted.unwrap().emit_str()
+          (false, false) => @riscv.print_functions(self.asm.unwrap())
+          _ => @util.die("can't emit code for both wasm and js")
         }
     }
   }

@@ -77,11 +77,11 @@ let importObject = {
         if (offset % 4 != 0) {
             offset = Math.ceil(offset / 4) * 4
         }
-        if (memory.buffer.byteLength < offset + size) {
+        if (memory.buffer.byteLength < offset + size * 4) {
             memory.grow(1)
         }
         let view = new Uint32Array(memory.buffer, offset, size);
-        view.fill(initial >>> 0)
+        view.fill(initial)
         let ptr = offset
         offset += size * 4
         return ptr;

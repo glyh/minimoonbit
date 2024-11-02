@@ -1,0 +1,13 @@
+{
+  "import": [
+    "moonbitlang/minimbt/closureps",
+    "moonbitlang/minimbt/cps",
+    "moonbitlang/minimbt/precps",
+    {
+      "path": "moonbitlang/minimbt",
+      "alias": "typing"
+    },
+    "moonbitlang/minimbt/util",
+    "lijunchen/unstable_io/env"
+  ]
+}

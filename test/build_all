@@ -22,8 +22,11 @@ moon run ../src/bin/main.mbt -- $SOURCE -o $1.s
 echo "building JS"
 moon run ../src/bin/main.mbt -- $SOURCE -o $1.js --js
 
+echo "building WASM"
+moon run ../src/bin/main.mbt -- $SOURCE -o $1.wat --wasm
+wasm-tools parse $1.wat -o $1.wasm
 
-echo "building Binary"
+echo "building RISCV Binary"
 zig build-exe -target riscv64-linux -femit-bin=$1 \
   $1.s ../riscv_rt/zig-out/lib/libmincaml.a \
   -O Debug -fno-strip -mcpu=baseline_rv64

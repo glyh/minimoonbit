@@ -7,5 +7,5 @@ fn fib(n : Int) -> Int {
 };
 
 fn main {
-  print_int(fib(2))
+  print_int(fib(8))
 };

@@ -29,6 +29,7 @@ test/*
 !test/test_src
 !test/longer-cases
 !test/script.gdb
+!test/debug.html
 !test/build_*
 !test/run_*
 !test/debug_*

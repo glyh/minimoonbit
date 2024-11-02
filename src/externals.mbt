@@ -18,6 +18,7 @@ pub let externals_list : Array[(String, Type)] = [
   ("create_array", Fun([Int, Int], Array(Int))),
   ("create_float_array", Fun([Int, Double], Array(Double))),
   ("create_ptr_array", Fun([Int, Ptr], Array(Ptr))),
+  ("malloc", Fun([Int], Ptr)),
 ]
 
 pub let externals : @immut/hashmap.T[String, Type] = externals_list.iter()

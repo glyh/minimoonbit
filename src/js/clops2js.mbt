@@ -17,12 +17,7 @@ pub fn emit_var(var : @cps.Var) -> String {
 
 pub fn emit_val(val : @cps.Value) -> String {
   match val {
-    //Var(var) => emit_var(var)
     Var(var) | Label(var) => emit_var(var)
-    //match self.label2lid[var] {
-    //  None => 
-    //  Some(id) => id.to_string()
-    //}
     Unit => "0"
     Int(i) => i.to_string()
     Bool(b) => b.to_string()
