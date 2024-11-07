@@ -135,7 +135,9 @@ pub fn CloPSInterpreter::call(
       _ => break
     }
   }
-  guard let Label(address) = f_val else { _ => @util.die("unreachable") }
+  guard let Label(address) = f_val else {
+    _ => @util.die("unreachable function \{f_val}")
+  }
   let f = self.clops.fnblocks[address].unwrap()
   self.reset_env()
   zip2(f.args, args_val).each(fn { (k, v) => self.cur_env[k] = v })

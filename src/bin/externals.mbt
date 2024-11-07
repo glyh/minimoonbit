@@ -1,5 +1,16 @@
 fn add_clops_interp_fns(interpreter : @closureps_eval.CloPSInterpreter) -> Unit {
   interpreter.add_extern_fn(
+    "print_char",
+    fn(args) {
+      match args[0] {
+        Int(i) => @io.print_char(Char::from_int(i))
+        _ => @util.die("print_char expects Int")
+      }
+      Unit
+    },
+    1,
+  )
+  interpreter.add_extern_fn(
     "print_int",
     fn(args) {
       match args[0] {

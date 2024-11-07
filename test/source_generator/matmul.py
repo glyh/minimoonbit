@@ -3,9 +3,9 @@
 import random
 from typing import List
 
-[l, n, m] = [10, 8, 9]
+[l, n, m] = [10, 10, 10]
 
-def generate_mat(m: int, n: int, min_value: float = 0.0, max_value: float = 5.0) -> List[List[float]]:
+def generate_mat(m: int, n: int, min_value: float = -10.0, max_value: float = 10.0) -> List[List[float]]:
     """
     Generates an m x n matrix filled with random floating-point numbers.
     
@@ -15,7 +15,7 @@ def generate_mat(m: int, n: int, min_value: float = 0.0, max_value: float = 5.0)
     :param max_value: Maximum value for random floats (inclusive)
     :return: m x n matrix with random floating-point numbers
     """
-    return [[random.uniform(min_value, max_value) for _ in range(n)] for _ in range(m)]
+    return [[round(random.uniform(min_value, max_value), 2) for _ in range(n)] for _ in range(m)]
 
 
 indent = 2
