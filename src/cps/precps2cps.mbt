@@ -4,16 +4,24 @@ typealias Cont = (Value) -> Cps
 fn CpsEnv::precps2cps_list(
   self : CpsEnv,
   a : Array[P],
-  c : (@immut/list.T[Value]) -> Cps
+  c : (Array[Value]) -> Cps
 ) -> Cps {
-  fn g(a : ArrayView[P], w : @immut/list.T[Value]) {
+  let vals = []
+  fn g(a : ArrayView[P]) {
     match a {
-      [e, .. as r] => self.precps2cps(e, fn(v) { g(r, @immut/list.Cons(v, w)) })
-      [] => c(w.rev())
+      [e, .. as r] =>
+        self.precps2cps(
+          e,
+          fn(v) {
+            vals.push(v)
+            g(r)
+          },
+        )
+      [] => c(vals)
     }
   }
 
-  g(a[:], @immut/list.of([]))
+  g(a[:])
 }
 
 // any passed params might not use label, but they should use a var instead
@@ -76,10 +84,9 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
     Var(ty, v) => c(Var(Var::from_precps(v, ty)))
     Label(ty, v) => c(Label(Var::from_precps(v, ty)))
     Tuple(tup_ty, elements) => {
-      fn c1(vs : @immut/list.T[Value]) {
+      fn c1(vs : Array[Value]) {
         let tmp = self.new_tmp(tup_ty)
-        let record_inner = vs.iter().collect()
-        Tuple(record_inner, tmp, c(Var(tmp)))
+        Tuple(vs, tmp, c(Var(tmp)))
       }
 
       self.precps2cps_list(elements, c1)
@@ -88,8 +95,7 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
     Prim(ret_ty, MakeArray, rands) => {
       let k_ref = self.new_tmp(Fun([ret_ty], Unit))
       let x_ref = self.new_tmp(ret_ty)
-      fn c1(es : @immut/list.T[Value]) {
-        let args = es.to_array()
+      fn c1(args : Array[Value]) {
         // len, elem, kont
         MakeArray(args[0], args[1], Var(k_ref))
       }
@@ -110,9 +116,9 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
             "unreachable: precps -> cps, makearray should be dealt with eearlier",
           )
       }
-      fn c1(a : @immut/list.T[Value]) {
+      fn c1(a : Array[Value]) {
         let tmp = self.new_tmp(ty)
-        Prim(rator, a.iter().collect(), tmp, c(Var(tmp)))
+        Prim(rator, a, tmp, c(Var(tmp)))
       }
 
       self.precps2cps_list(rands, c1)
@@ -123,8 +129,10 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
         let k_ref = self.new_tmp(Fun([ret_ty], Unit))
         let x_ref = self.new_tmp(ret_ty)
         fn c1(f : Value) {
-          fn c2(es : @immut/list.T[Value]) {
-            App(f, es.iter().append(Var(k_ref)).map(fix_label_to_var).collect())
+          fn c2(es : Array[Value]) {
+            es.push(Var(k_ref))
+            es.map_inplace(fix_label_to_var)
+            App(f, es)
           }
 
           self.precps2cps_list(args, c2)
@@ -140,25 +148,25 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
       guard let Some(name) = var.name else { _ => return generate_app() }
       match name {
         "int_of_float" | "truncate" => {
-          fn c1(a : @immut/list.T[Value]) {
+          fn c1(a : Array[Value]) {
             let tmp = self.new_tmp(ret_ty)
-            Prim(IntOfFloat, a.iter().collect(), tmp, c(Var(tmp)))
+            Prim(IntOfFloat, a, tmp, c(Var(tmp)))
           }
 
           self.precps2cps_list(args, c1)
         }
         "float_of_int" => {
-          fn c1(a : @immut/list.T[Value]) {
+          fn c1(a : Array[Value]) {
             let tmp = self.new_tmp(ret_ty)
-            Prim(FloatOfInt, a.iter().collect(), tmp, c(Var(tmp)))
+            Prim(FloatOfInt, a, tmp, c(Var(tmp)))
           }
 
           self.precps2cps_list(args, c1)
         }
         "abs_float" => {
-          fn c1(a : @immut/list.T[Value]) {
+          fn c1(a : Array[Value]) {
             let tmp = self.new_tmp(ret_ty)
-            Prim(AbsFloat, a.iter().collect(), tmp, c(Var(tmp)))
+            Prim(AbsFloat, a, tmp, c(Var(tmp)))
           }
 
           self.precps2cps_list(args, c1)
