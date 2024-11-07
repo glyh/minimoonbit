@@ -1,27 +1,20 @@
 // REF: Compiling with Continuations
-typealias Cont = (Value) -> Cps
+typealias Cont[C] = (Value) -> Trampo[C]
 
-fn CpsEnv::precps2cps_list(
-  self : CpsEnv,
-  a : Array[P],
-  c : (Array[Value]) -> Cps
-) -> Cps {
-  let vals = []
-  fn g(a : ArrayView[P]) {
-    match a {
-      [e, .. as r] =>
-        self.precps2cps(
-          e,
-          fn(v) {
-            vals.push(v)
-            g(r)
-          },
-        )
-      [] => c(vals)
-    }
-  }
+struct MultiNest[C] {
+  nest : ArrayView[Trampo[C]]
+  forced : Array[C]
+  tmp_stack : Array[(Cps) -> Trampo[Cps]]
+  unite : (Array[Cps]) -> Trampo[C]
+}
 
-  g(a[:])
+enum Trampo[C] {
+  One(P, Cont[C])
+  Multi(ArrayView[P], Array[Value], (Array[Value]) -> Trampo[C])
+  Nest(MultiNest[C])
+  //pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
+  Just(C)
+  Then(Trampo[C], (C) -> Trampo[C])
 }
 
 // any passed params might not use label, but they should use a var instead
@@ -33,7 +26,11 @@ fn fix_label_to_var(v : Value) -> Value {
   }
 }
 
-pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
+fn CpsEnv::generate_trampoline(
+  self : CpsEnv,
+  s : P,
+  c : Cont[Cps]
+) -> Trampo[Cps] {
   match s {
     Unit => c(Unit)
     Bool(b) => c(Bool(b))
@@ -41,12 +38,12 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
     Double(f) => c(Double(f))
     Let(ty, name, rhs, rest) => {
       fn c1(v : Value) {
-        let rest = self.precps2cps(rest, c)
-        let orig_binding = Var::from_precps(name, ty)
-        rest.replace_var_bind(orig_binding, v)
+        let rest = One(rest, c)
+        let orignal_binding = Var::from_precps(name, ty)
+        Then(rest, fn(val) { Just(val.replace_var_bind(orignal_binding, v)) })
       }
 
-      self.precps2cps(rhs, c1)
+      One(rhs, c1)
     }
     // NOTE:
     // Any function f of type (a1, a2, a3, .., an) -> r has been transformed into
@@ -71,14 +68,23 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
       new_vars.push(k_ref)
       let f_ref = Var::from_precps(fn_name, new_f_type)
       fn fn_cont(returned : Value) {
-        App(Var(k_ref), [returned].map(fix_label_to_var))
+        Just(App(Var(k_ref), [returned].map(fix_label_to_var)))
       }
 
-      Fix(
-        f_ref,
-        new_vars,
-        self.precps2cps(body, fn_cont),
-        self.precps2cps(rest, c),
+      let trampo_body = One(body, fn_cont)
+      let trampo_rest = One(rest, c)
+      Nest(
+        {
+          nest: [trampo_body, trampo_rest][:],
+          forced: [],
+          tmp_stack: [],
+          unite: fn(parts) {
+            guard let [body, rest] = parts else {
+              _ => @util.die("unreachable")
+            }
+            Just(Fix(f_ref, new_vars, body, rest))
+          },
+        },
       )
     }
     Var(ty, v) => c(Var(Var::from_precps(v, ty)))
@@ -86,10 +92,10 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
     Tuple(tup_ty, elements) => {
       fn c1(vs : Array[Value]) {
         let tmp = self.new_tmp(tup_ty)
-        Tuple(vs, tmp, c(Var(tmp)))
+        Then(c(Var(tmp)), fn(c_tmp) { Just(Tuple(vs, tmp, c_tmp)) })
       }
 
-      self.precps2cps_list(elements, c1)
+      Multi(elements[:], [], c1)
     }
     // WARN: Array Creation must come with an external call and thus continuation
     Prim(ret_ty, MakeArray, rands) => {
@@ -97,10 +103,22 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
       let x_ref = self.new_tmp(ret_ty)
       fn c1(args : Array[Value]) {
         // len, elem, kont
-        MakeArray(args[0], args[1], Var(k_ref))
+        Just(MakeArray(args[0], args[1], Var(k_ref)))
       }
 
-      Fix(k_ref, [x_ref], c(Var(x_ref)), self.precps2cps_list(rands, c1))
+      Nest(
+        {
+          nest: [c(Var(x_ref)), Multi(rands[:], [], c1)][:],
+          forced: [],
+          tmp_stack: [],
+          unite: fn(parts) {
+            guard let [c_x_ref, rands] = parts else {
+              _ => @util.die("unreachable")
+            }
+            Just(Fix(k_ref, [x_ref], c_x_ref, rands))
+          },
+        },
+      )
     }
     Prim(ty, rator, rands) => {
       let rator = match rator {
@@ -116,12 +134,12 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
             "unreachable: precps -> cps, makearray should be dealt with eearlier",
           )
       }
-      fn c1(a : Array[Value]) {
+      fn c1(rands : Array[Value]) {
         let tmp = self.new_tmp(ty)
-        Prim(rator, a, tmp, c(Var(tmp)))
+        Then(c(Var(tmp)), fn(c_tmp) { Just(Prim(rator, rands, tmp, c_tmp)) })
       }
 
-      self.precps2cps_list(rands, c1)
+      Multi(rands[:], [], c1)
     }
     // (a1, a2, a3, .., an, (r) -> Unit)
     App(ret_ty, f, args) => {
@@ -132,13 +150,25 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
           fn c2(es : Array[Value]) {
             es.push(Var(k_ref))
             es.map_inplace(fix_label_to_var)
-            App(f, es)
+            Just(App(f, es))
           }
 
-          self.precps2cps_list(args, c2)
+          Multi(args[:], [], c2)
         }
 
-        Fix(k_ref, [x_ref], c(Var(x_ref)), self.precps2cps(f, c1))
+        Nest(
+          {
+            nest: [c(Var(x_ref)), One(f, c1)][:],
+            forced: [],
+            tmp_stack: [],
+            unite: fn(parts) {
+              guard let [c_x_ref, app_call] = parts else {
+                _ => @util.die("unreachable")
+              }
+              Just(Fix(k_ref, [x_ref], c_x_ref, app_call))
+            },
+          },
+        )
       }
 
       guard let Var(_, var) | Label(_, var) = f else {
@@ -150,26 +180,32 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
         "int_of_float" | "truncate" => {
           fn c1(a : Array[Value]) {
             let tmp = self.new_tmp(ret_ty)
-            Prim(IntOfFloat, a, tmp, c(Var(tmp)))
+            Then(
+              c(Var(tmp)),
+              fn(c_tmp) { Just(Prim(IntOfFloat, a, tmp, c_tmp)) },
+            )
           }
 
-          self.precps2cps_list(args, c1)
+          Multi(args[:], [], c1)
         }
         "float_of_int" => {
           fn c1(a : Array[Value]) {
             let tmp = self.new_tmp(ret_ty)
-            Prim(FloatOfInt, a, tmp, c(Var(tmp)))
+            Then(
+              c(Var(tmp)),
+              fn(c_tmp) { Just(Prim(FloatOfInt, a, tmp, c_tmp)) },
+            )
           }
 
-          self.precps2cps_list(args, c1)
+          Multi(args[:], [], c1)
         }
         "abs_float" => {
           fn c1(a : Array[Value]) {
             let tmp = self.new_tmp(ret_ty)
-            Prim(AbsFloat, a, tmp, c(Var(tmp)))
+            Then(c(Var(tmp)), fn(c_tmp) { Just(Prim(AbsFloat, a, tmp, c_tmp)) })
           }
 
-          self.precps2cps_list(args, c1)
+          Multi(args[:], [], c1)
         }
         _ => generate_app()
       }
@@ -177,85 +213,146 @@ pub fn CpsEnv::precps2cps(self : CpsEnv, s : P, c : Cont) -> Cps {
     KthTuple(ret_ty, offset, tup) => {
       fn c1(v : Value) {
         let tmp = self.new_tmp(ret_ty)
-        KthTuple(offset, v, tmp, c(Var(tmp)))
+        Then(c(Var(tmp)), fn(c_tmp) { Just(KthTuple(offset, v, tmp, c_tmp)) })
       }
 
-      self.precps2cps(tup, c1)
+      One(tup, c1)
     }
     If(ret_ty, Prim(Bool, Eq, [lhs, rhs]), _then, _else) => {
-      fn c1(lhs : Value) -> Cps {
+      fn c1(lhs : Value) {
         // To avoid exponential growth in CPS ir, we abstract the outer `c` out.
-        fn c2(rhs : Value) -> Cps {
+        fn c2(rhs : Value) {
           let k_ref = self.new_tmp(Fun([ret_ty], Unit))
           let x_ref = self.new_tmp(ret_ty)
-          fn c3(branch : Value) -> Cps {
-            App(Var(k_ref), [branch].map(fix_label_to_var))
+          fn c3(branch : Value) {
+            Just(App(Var(k_ref), [branch].map(fix_label_to_var)))
           }
 
-          Fix(
-            k_ref,
-            [x_ref],
-            c(Var(x_ref)),
-            IfEq(
-              lhs,
-              rhs,
-              self.precps2cps(_then, c3),
-              self.precps2cps(_else, c3),
-            ),
+          Nest(
+            {
+              nest: [c(Var(x_ref)), One(_then, c3), One(_else, c3)][:],
+              forced: [],
+              tmp_stack: [],
+              unite: fn(parts) {
+                guard let [c_x_ref, _then, _else] = parts else {
+                  _ => @util.die("unreachable")
+                }
+                Just(Fix(k_ref, [x_ref], c_x_ref, IfEq(lhs, rhs, _then, _else)))
+              },
+            },
           )
         }
 
-        self.precps2cps(rhs, c2)
+        One(rhs, c2)
       }
 
-      self.precps2cps(lhs, c1)
+      One(lhs, c1)
     }
     If(ret_ty, Prim(Bool, Le, [lhs, rhs]), _then, _else) => {
-      fn c1(lhs : Value) -> Cps {
+      fn c1(lhs : Value) {
         // To avoid exponential growth in CPS ir, we abstract the outer `c` out.
-        fn c2(rhs : Value) -> Cps {
+        fn c2(rhs : Value) {
           let k_ref = self.new_tmp(Fun([ret_ty], Unit))
           let x_ref = self.new_tmp(ret_ty)
-          fn c3(branch : Value) -> Cps {
-            App(Var(k_ref), [branch].map(fix_label_to_var))
+          fn c3(branch : Value) {
+            Just(App(Var(k_ref), [branch].map(fix_label_to_var)))
           }
 
-          Fix(
-            k_ref,
-            [x_ref],
-            c(Var(x_ref)),
-            IfLe(
-              lhs,
-              rhs,
-              self.precps2cps(_then, c3),
-              self.precps2cps(_else, c3),
-            ),
+          Nest(
+            {
+              nest: [c(Var(x_ref)), One(_then, c3), One(_else, c3)][:],
+              forced: [],
+              tmp_stack: [],
+              unite: fn(parts) {
+                guard let [c_x_ref, _then, _else] = parts else {
+                  _ => @util.die("unreachable")
+                }
+                Just(Fix(k_ref, [x_ref], c_x_ref, IfLe(lhs, rhs, _then, _else)))
+              },
+            },
           )
         }
 
-        self.precps2cps(rhs, c2)
+        One(rhs, c2)
       }
 
-      self.precps2cps(lhs, c1)
+      One(lhs, c1)
     }
     If(ret_ty, cond, _then, _else) => {
-      fn c1(cond : Value) -> Cps {
+      fn c1(cond : Value) {
         // To avoid exponential growth in CPS ir, we abstract the outer `c` out.
         let k_ref = self.new_tmp(Fun([ret_ty], Unit))
         let x_ref = self.new_tmp(ret_ty)
-        fn c2(branch : Value) -> Cps {
-          App(Var(k_ref), [branch].map(fix_label_to_var))
+        fn c2(branch : Value) {
+          Just(App(Var(k_ref), [branch].map(fix_label_to_var)))
         }
 
-        Fix(
-          k_ref,
-          [x_ref],
-          c(Var(x_ref)),
-          If(cond, self.precps2cps(_then, c2), self.precps2cps(_else, c2)),
+        Nest(
+          {
+            nest: [c(Var(x_ref)), One(_then, c2), One(_else, c2)][:],
+            forced: [],
+            tmp_stack: [],
+            unite: fn(parts) {
+              guard let [c_x_ref, _then, _else] = parts else {
+                _ => @util.die("unreachable")
+              }
+              Just(Fix(k_ref, [x_ref], c_x_ref, If(cond, _then, _else)))
+            },
+          },
         )
       }
 
-      self.precps2cps(cond, c1)
+      One(cond, c1)
+    }
+  }
+}
+
+pub fn cps_conv_trampolined(env : CpsEnv, input : P) -> Cps {
+  let root_then_stack = []
+  let nest_stack = []
+  let then_stacks = [root_then_stack]
+  loop One(input, fn { _ => Just(Exit) }) {
+    One(p, cont) => continue env.generate_trampoline(p, cont)
+    Multi([], collected, cont) => continue cont(collected)
+    Multi([p, .. as rest], collected, cont) =>
+      continue One(p, fn(v) { Multi(rest, collected + [v], cont) })
+    Nest({ nest: [], unite, .. }) => continue unite([])
+    Nest({ nest: [hd, .. as nest_rest], tmp_stack, .. } as info) => {
+      nest_stack.push({ ..info, nest: nest_rest })
+      then_stacks.push(tmp_stack)
+      continue hd
+    }
+    Just(c) => {
+      guard let Some(cur_stack) = then_stacks.last() else {
+        _ => @util.die("no stack available")
+      }
+      match cur_stack.pop() {
+        None =>
+          match nest_stack.pop() {
+            None => break c
+            Some(nest_info) =>
+              match nest_info {
+                { nest: [], forced, unite, .. } => {
+                  forced.push(c)
+                  ignore(then_stacks.pop())
+                  continue unite(forced)
+                }
+                { nest: [hd, .. as rest], forced, .. } => {
+                  forced.push(c)
+                  nest_stack.push({ ..nest_info, nest: rest })
+                  continue hd
+                }
+              }
+          }
+        Some(cont) => continue cont(c)
+      }
+    }
+    Then(cur, cont) => {
+      guard let Some(cur_stack) = then_stacks.last() else {
+        _ => @util.die("no stack available")
+      }
+      cur_stack.push(cont)
+      continue cur
     }
   }
 }
