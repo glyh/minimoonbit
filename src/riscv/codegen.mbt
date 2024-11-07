@@ -943,10 +943,7 @@ fn CodegenBlock::codegen(self : CodegenBlock) -> Unit {
       // 2. prepare regs for continuation. A0 is already the array
       self.resolve_loop([(continuation, I(A1))])
       // 3. Generate the call to continuation
-      let cont_reg = self.pull_val_i(continuation)
-      self.insert_asms(
-        [Ld(cont_reg, { base: cont_reg, offset: 0 }), Jr(cont_reg)],
-      )
+      self.insert_asms([Ld(reg_swap, { base: A1, offset: 0 }), Jr(reg_swap)])
     }
     Call(f, args) => {
       // 1. Fill in the params to regs
