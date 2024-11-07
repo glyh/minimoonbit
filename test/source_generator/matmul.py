@@ -59,12 +59,14 @@ fn matshow(m: Int, n: Int, mat: Array[Array[Double]]) -> Unit {
       fn loop2(j: Int) -> Unit {
         if j <= n - 1 {
           let _ = print_int(truncate(mat[i][j]));
-          print_endline()
+          let _ = print_char(32);
+          loop2(j+1)
         } else {
-          ()
+          print_endline()
         }
       }; 
-      loop2(0)
+      let _ = loop2(0);
+      loop1(i+1)
     } else {
       ()
     }
@@ -121,7 +123,7 @@ fn main {
 };"""
 
 source_path = "../test_src/matmul_gen.mbt"
-out_path = "../test_src/matmul_gen.out"
+ans_path = "../test_src/matmul_gen.ans"
 
 with open(source_path, 'w') as source_file:
     source_file.write(generated)
@@ -158,7 +160,10 @@ def float_to_ieee754(float_value):
 
 mat_c = matrix_multiply(mat_a, mat_b)
 
-with open(out_path, 'w') as out_file:
-    out_file.write(f"{mat_c}")
+with open(ans_path, 'w') as ans_file:
+    for row in mat_c:
+        for ele in row:
+            ans_file.write(f'{int(ele)} ')
+        ans_file.write('\n')
 
 
