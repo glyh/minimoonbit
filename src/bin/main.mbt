@@ -304,7 +304,6 @@ fn main {
   if closureps_interpreter.val {
     let clops = status.clops.unwrap()
     let interpreter = @closureps_eval.CloPSInterpreter::new(clops)
-    add_clops_interp_fns(interpreter)
     try {
       interpreter.eval!(clops.root)
     } catch {

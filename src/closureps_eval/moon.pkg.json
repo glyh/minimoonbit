@@ -7,7 +7,8 @@
             "path": "moonbitlang/minimbt",
             "alias": "types"
         },
-        "moonbitlang/minimbt/util"
+        "moonbitlang/minimbt/util",
+        "lijunchen/unstable_io/io"
     ],
     "test-import": [
         "moonbitlang/minimbt/parser",

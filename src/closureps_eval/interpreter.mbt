@@ -56,6 +56,7 @@ fn CloPSInterpreter::reset_env(self : CloPSInterpreter) -> Unit {
 pub fn CloPSInterpreter::new(clops : @closureps.ClosurePS) -> CloPSInterpreter {
   let ret = { extern_fns: Map::new(), clops, cur_env: @hashmap.new() }
   ret.reset_env()
+  ret.init_extern_fns()
   ret
 }
 

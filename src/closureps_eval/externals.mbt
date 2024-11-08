@@ -1,4 +1,4 @@
-fn add_clops_interp_fns(interpreter : @closureps_eval.CloPSInterpreter) -> Unit {
+fn CloPSInterpreter::init_extern_fns(interpreter : CloPSInterpreter) -> Unit {
   interpreter.add_extern_fn(
     "print_char",
     fn(args) {
@@ -29,9 +29,9 @@ fn add_clops_interp_fns(interpreter : @closureps_eval.CloPSInterpreter) -> Unit 
     },
     0,
   )
-  let create_array = fn(args : Array[@closureps_eval.Value]) {
+  let create_array = fn(args : Array[Value]) {
     match args[0] {
-      Int(n) => @closureps_eval.Value::Array(Array::make(n, args[1]))
+      Int(n) => Value::Array(Array::make(n, args[1]))
       _ => @util.die("create_array expects Int")
     }
   }

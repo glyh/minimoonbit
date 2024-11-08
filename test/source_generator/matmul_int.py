@@ -3,9 +3,9 @@
 import random
 from typing import List
 
-[l, n, m] = [10, 10, 10]
+[l, n, m] = [18, 15, 16]
 
-def generate_mat(m: int, n: int, min_value: float = 0.0, max_value: float = 10.0) -> List[List[float]]:
+def generate_mat(m: int, n: int, min_value: int = -8, max_value: int = 8) -> List[List[int]]:
     """
     Generates an m x n matrix filled with random floating-point numbers.
     
@@ -15,13 +15,13 @@ def generate_mat(m: int, n: int, min_value: float = 0.0, max_value: float = 10.0
     :param max_value: Maximum value for random floats (inclusive)
     :return: m x n matrix with random floating-point numbers
     """
-    return [[round(random.uniform(min_value, max_value), 2) for _ in range(n)] for _ in range(m)]
+    return [[random.randint(min_value, max_value) for _ in range(n)] for _ in range(m)]
 
 
 indent = 2
 indent_str = " " * indent
 
-def format_mat(symbol: str, m: int, n: int, mat: List[List[float]]) -> str:
+def format_mat(symbol: str, m: int, n: int, mat: List[List[int]]) -> str:
     ret = ""
     for row in range(m):
         for col in range(n):
@@ -57,12 +57,12 @@ operate_mat += "\n" + indent_str + f"()"
 operate_mat += "\n"
 
 generated = """
-fn matshow(m: Int, n: Int, mat: Array[Array[Double]]) -> Unit {
+fn matshow(m: Int, n: Int, mat: Array[Array[Int]]) -> Unit {
   fn loop1(i: Int) -> Unit {
     if i <= m - 1 {
       fn loop2(j: Int) -> Unit {
         if j <= n - 1 {
-          let _ = print_int(truncate(mat[i][j]));
+          let _ = print_int(mat[i][j]);
           let _ = print_char(32);
           loop2(j+1)
         } else {
@@ -78,7 +78,7 @@ fn matshow(m: Int, n: Int, mat: Array[Array[Double]]) -> Unit {
   loop1(0)
 };
 
-fn matmul(l: Int, m: Int, n: Int, a: Array[Array[Double]], b: Array[Array[Double]], c: Array[Array[Double]]) -> Unit {
+fn matmul(l: Int, m: Int, n: Int, a: Array[Array[Int]], b: Array[Array[Int]], c: Array[Array[Int]]) -> Unit {
   fn loop1(i: Int) -> Unit {
     if 0 <= i {
       fn loop2(j: Int) -> Unit {
@@ -107,12 +107,12 @@ fn matmul(l: Int, m: Int, n: Int, a: Array[Array[Double]], b: Array[Array[Double
 };
 
 fn main {
-  let dummy = Array::make(0, 0.0);
-  fn gen_arr(m: Int, n: Int) -> Array[Array[Double]] {
+  let dummy = Array::make(0, 0);
+  fn gen_arr(m: Int, n: Int) -> Array[Array[Int]] {
     let mat = Array::make(m, dummy);
     fn init_arr(i: Int) -> Unit {
       if 0 <= i {
-        mat[i] = Array::make(n, 0.0);
+        mat[i] = Array::make(n, 0);
         init_arr(i - 1)
       } else {
         ()
@@ -126,8 +126,8 @@ fn main {
 """
 };"""
 
-source_path = "../test_src/matmul_gen.mbt"
-ans_path = "../test_src/matmul_gen.ans"
+source_path = "../test_src/matmul_gen_int.mbt"
+ans_path = "../test_src/matmul_gen_int.ans"
 
 with open(source_path, 'w') as source_file:
     source_file.write(generated)
